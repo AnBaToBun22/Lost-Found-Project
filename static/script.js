@@ -1,0 +1,1332 @@
+// --- 1. DỮ LIỆU & BIẾN TOÀN CỤC ---
+let mockData = [
+    { id: 1, type: 'lost', name: 'Ví da nam màu đen', location: 'Nhà xe khu A', date: '2 giờ trước', image: 'https://via.placeholder.com/300x180/333/fff?text=Wallet' },
+    { id: 2, type: 'found', name: 'Chìa khóa xe Honda', location: 'Căn tin B', date: '5 giờ trước', image: 'https://via.placeholder.com/300x180/ddd/333?text=Keys' },
+];
+
+// Biến lưu người dùng đang đăng nhập
+let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+let allPostsData = []; // Biến lưu toàn bộ bài viết từ DB để xem chi tiết
+
+// --- 2. HỆ THỐNG AUTH (LOGIN/LOGOUT/REGISTER) ---
+
+// Khởi chạy khi load trang: Kiểm tra xem đã login chưa
+function initAuth() {
+    const userArea = document.getElementById('userArea');
+    if (currentUser) {
+        // Đã đăng nhập -> Hiện Avatar + Mũi tên (Giống Facebook)
+        userArea.innerHTML = `
+            <div class="user-dropdown-container">
+                <div class="user-trigger" onclick="toggleDropdown(event)">
+                    <div class="user-avatar-circle">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <i class="fa-solid fa-chevron-down caret-icon"></i>
+                </div>
+                <div id="userDropdownMenu" class="dropdown-menu-box">
+                    <div class="menu-header"><strong>${currentUser.username}</strong></div>
+                    <hr>
+                    <button class="menu-item logout-red" onclick="handleLogout()">
+                        <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        // Chưa đăng nhập -> Hiện nút Login cũ của bạn
+        userArea.innerHTML = `
+            <button class="btn-login" onclick="openAuthModal()">
+                <i class="fa-regular fa-user"></i> Đăng nhập
+            </button>
+        `;
+    }
+}
+
+// Mở Modal Auth
+function openAuthModal() {
+    document.getElementById('authModal').style.display = 'flex';
+    switchAuth('login'); // Mặc định mở tab Login
+}
+
+// Chuyển đổi giữa Login / Register / Forgot với Animation
+function switchAuth(mode) {
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const forgotForm = document.getElementById('forgotForm');
+    const allForms = [loginForm, registerForm, forgotForm];
+
+    // Thêm animation fade-out cho các form đang hiển thị
+    allForms.forEach(form => {
+        if (form.style.display !== 'none') {
+            form.classList.add('fade-out');
+            form.classList.remove('fade-in');
+        }
+    });
+
+    // Chuyển đổi form sau khi animation hoàn thành
+    setTimeout(() => {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'none';
+        forgotForm.style.display = 'none';
+        
+        let activeForm;
+        if(mode === 'login') activeForm = loginForm;
+        if(mode === 'register') activeForm = registerForm;
+        if(mode === 'forgot') activeForm = forgotForm;
+        
+        if (activeForm) {
+            activeForm.style.display = 'block';
+            activeForm.classList.add('fade-in');
+            activeForm.classList.remove('fade-out');
+        }
+    }, 300);
+}
+
+// Xử lý ĐĂNG KÝ với Animation
+function handleRegister() {
+    const user = document.getElementById('regUser').value;
+    const email = document.getElementById('regEmail').value;
+    const pass = document.getElementById('regPass').value;
+    const phone = document.getElementById('regPhone').value;
+    const region = document.getElementById('regRegion').value;
+    const regButton = document.querySelector('#registerForm .btn-submit');
+
+    if (!user || !email || !pass) {
+        showErrorMessage('registerForm', "Vui lòng nhập đầy đủ thông tin!");
+        return;
+    }
+    if (!email.includes('@')) {
+        showErrorMessage('registerForm', "Email không hợp lệ!");
+        return;
+    }
+
+    if (pass.length < 6) {
+        showErrorMessage('registerForm', "Mật khẩu phải có ít nhất 6 ký tự!");
+        return;
+    }
+
+    // Thêm loading animation
+    regButton.classList.add('loading');
+
+    // GỌI API THAY VÌ LƯU LOCALSTORAGE
+    fetch('http://127.0.0.1:5000/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            username: user,
+            email: email,
+            password: pass,
+            phone: phone,
+            region: region })
+    })
+    .then(response => response.json())
+    .then(data => {
+        regButton.classList.remove('loading');
+        
+        if (data.message === "Đăng ký thành công!") {
+            showSuccessMessage('registerForm', "✓ Đăng ký thành công! Hãy đăng nhập.");
+            setTimeout(() => switchAuth('login'), 1500);
+        } else {
+            showErrorMessage('registerForm', data.message);
+        }
+    })
+    .catch(error => {
+        regButton.classList.remove('loading');
+        showErrorMessage('registerForm', "Lỗi kết nối!! Tài khoản bị trùng tên hoặc email đã tồn tại.");
+        console.error('Error:', error);
+    });
+}
+
+// Xử lý ĐĂNG NHẬP
+async function handleLogin() {
+    const user = document.getElementById('loginUser').value;
+    const pass = document.getElementById('loginPass').value;
+    const loginForm = document.getElementById('loginForm');
+    const loginButton = loginForm.querySelector('.btn-submit');
+
+    if (!user || !pass) {
+        showErrorMessage('loginForm', "Vui lòng nhập đầy đủ thông tin!");
+        return;
+    }
+
+    // Bật loading
+    loginButton.classList.add('loading');
+    loginButton.disabled = true;
+
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            currentUser = data.user; 
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
+            if (currentUser.role === "admin") {
+                window.location.href = "/admin.html";
+                return;
+            }
+
+            showSuccessMessage('loginForm', "✓ " + data.message);
+            
+            setTimeout(() => {
+                closeModal('authModal');
+                initAuth();
+            }, 1000);
+        } else {
+            showErrorMessage('loginForm', "✗ " + data.message);
+        }
+    } catch (error) {
+        showErrorMessage('loginForm', "Không thể kết nối đến máy chủ!");
+        console.error("Lỗi:", error);
+    } finally {
+        loginButton.classList.remove('loading');
+        loginButton.disabled = false;
+    }
+}
+
+// Xử lý ĐĂNG XUẤT
+function handleLogout() {
+    if(confirm("Bạn có chắc muốn đăng xuất?")) {
+        localStorage.removeItem('currentUser');
+        currentUser = null;
+        initAuth();
+        window.location.reload();
+    }
+}
+
+// Xử lý QUÊN MẬT KHẨU (Fake)
+function handleForgot() {
+    const email = document.getElementById('forgotEmail').value;
+    if(email) {
+        alert(`Mã OTP đã được gửi về ${email}. (Demo: Mật khẩu của bạn là '123')`);
+        switchAuth('login');
+    } else {
+        alert("Vui lòng nhập email!");
+    }
+}
+
+// --- 3. CÁC CHỨC NĂNG CHÍNH (ĐĂNG TIN, HIỂN THỊ) ---
+
+// ── Xem trước ảnh trước khi upload ───────────────────────────────
+function previewImage(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const preview = document.getElementById('imagePreview');
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+// ── Hiện/ẩn ô secret + mở modal đăng tin ─────────────────────────
+let currentPostType = 'lost';
+function checkLoginBeforeAction(type) {
+    if (!currentUser) {
+        alert("Bạn cần Đăng nhập để thực hiện chức năng này!");
+        openAuthModal();
+        return;
+    }
+    currentPostType = type;
+    const modal  = document.getElementById('postModal');
+    const title  = document.getElementById('modalTitle');
+    const secret = document.getElementById('secretGroup');
+
+    title.innerText = type === 'lost' ? '🔴 Đăng tin MẤT ĐỒ' : '🟢 Đăng tin NHẶT ĐƯỢC';
+    title.style.color = type === 'lost' ? 'var(--lost)' : 'var(--found)';
+
+    // Chỉ hiện ô bí mật khi đăng "Found"
+    secret.style.display = type === 'found' ? 'block' : 'none';
+
+    // Set mặc định ngày hôm nay
+    document.getElementById('itemDate').value = new Date().toISOString().split('T')[0];
+
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        if (!map) {
+            initMap(); // Khởi tạo lần đầu
+        } else {
+            map.invalidateSize(); // Các lần sau chỉ cần refresh lại kích thước
+        }
+    }, 300);
+}
+let mainMap;
+let mainMarkersLayer;
+
+// 1. Hàm bật/tắt bản đồ khi bấm nút
+function toggleMainMap() {
+    const container = document.getElementById('mainMapContainer');
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        if (!mainMap) {
+            initMainMap(); // Lần đầu mở thì khởi tạo
+        } else {
+            drawPinsOnMap(allPostsData); // Các lần sau thì vẽ lại ghim
+        }
+        // Ép bản đồ load lại kích thước để không bị lỗi xám mờ
+        setTimeout(() => mainMap.invalidateSize(), 300);
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+// 2. Hàm khởi tạo bản đồ lớn
+function initMainMap() {
+    mainMap = L.map('mainMap').setView([16.0544, 108.2022], 13); // Tọa độ mặc định (Đà Nẵng)
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(mainMap);
+    
+    mainMarkersLayer = L.layerGroup().addTo(mainMap); // Lớp chứa các cây ghim
+    
+    // Nếu trang đã tải xong dữ liệu bài viết thì vẽ ghim luôn
+    if (typeof allPostsData !== 'undefined' && allPostsData.length > 0) {
+        drawPinsOnMap(allPostsData);
+    }
+
+let searchMarker; // Biến lưu cây cờ tìm kiếm tạm thời
+
+    L.Control.geocoder({
+        defaultMarkGeocode: false,
+        placeholder: "🔍 Nhập Tên đường, Thành phố (VD: An Cư 7, Đà Nẵng)...",
+        errorMessage: "Không tìm ra (Thử bỏ số nhà, chỉ ghi Tên đường + Tỉnh/TP nhé)."
+    }).on('markgeocode', function(e) {
+        const latlng = e.geocode.center;
+
+        // 1. Bay đến vị trí tìm được và phóng to lên mức 17
+        mainMap.setView(latlng, 17); 
+
+        // 2. Nếu trước đó có tìm chỗ khác rồi thì rút cây cờ cũ ra
+        if (searchMarker) {
+            mainMap.removeLayer(searchMarker);
+        }
+
+        // 3. Cắm cây cờ mới vào đúng vị trí vừa tìm
+        searchMarker = L.marker(latlng).addTo(mainMap);
+
+        // 4. Hiện luôn một cái bảng nhỏ báo tên đường nó tìm được
+        searchMarker.bindPopup(`<b>📍 Kết quả tìm kiếm:</b><br>${e.geocode.name}`).openPopup();
+
+    }).addTo(mainMap);
+}
+
+// 3. Hàm cắm ghim tất cả bài viết lên bản đồ
+function drawPinsOnMap(posts) {
+    if (!mainMap || !mainMarkersLayer) return;
+    
+    mainMarkersLayer.clearLayers(); // Xóa sạch ghim cũ trên bản đồ
+    
+    posts.forEach(post => {
+        // Chỉ vẽ những bài nào CÓ LƯU TỌA ĐỘ
+        if (post.latitude && post.longitude) {
+            const lat = parseFloat(post.latitude);
+            const lng = parseFloat(post.longitude);
+            
+            // Tạo cây ghim
+            const marker = L.marker([lat, lng]);
+            
+            // Thiết kế nội dung cái bảng nhỏ hiện ra khi bấm vào cây ghim
+            const popupContent = `
+                <div style="text-align: center; min-width: 150px;">
+                    <div style="font-size: 12px; font-weight: bold; color: ${post.type === 'lost' ? '#e74c3c' : '#1DD1A1'}; margin-bottom: 5px;">
+                        ${post.type === 'lost' ? '🔴 Đang tìm' : '🟢 Đã nhặt'}
+                    </div>
+                    <strong style="font-size: 14px; color: #333;">${post.item_name}</strong>
+                    <div style="font-size: 12px; color: #777; margin: 5px 0;">📍 ${post.location}</div>
+                    <button onclick="showPostDetail(${post.id})" style="background: #3498db; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; width: 100%;">
+                        Xem chi tiết
+                    </button>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            mainMarkersLayer.addLayer(marker);
+        }
+    });
+}
+
+// ── Gửi bài đăng lên server ───────────────────────────────────────
+async function handlePost(e) {
+    e.preventDefault();
+    const btn = document.querySelector('#postForm .btn-submit');
+    btn.innerText = '⏳ Đang đăng và phân tích...'; // Đổi chữ cho ngầu
+    btn.disabled = true;
+
+    // Đọc ảnh dạng base64
+    let image_base64 = null;
+    const imgFile = document.getElementById('itemImage').files[0];
+    if (imgFile) {
+        image_base64 = await new Promise(resolve => {
+            const r = new FileReader();
+            r.onload = e => resolve(e.target.result);
+            r.readAsDataURL(imgFile);
+        });
+    }
+
+    const payload = {
+        user_id      : currentUser.id,
+        username     : currentUser.username,
+        type         : currentPostType,
+        item_name    : document.getElementById('itemName').value,
+        category     : document.getElementById('itemCategory').value,
+        location     : document.getElementById('itemLocation').value,
+        
+        // --- CHÚ Ý: ĐÃ THÊM LẠI 2 DÒNG TỌA ĐỘ BẢN ĐỒ ---
+        latitude     : document.getElementById('latitude')?.value || '',
+        longitude    : document.getElementById('longitude')?.value || '',
+        // ----------------------------------------------
+        
+        lost_date    : document.getElementById('itemDate').value,
+        description  : document.getElementById('itemDescription').value,
+        secret_detail: document.getElementById('itemSecret')?.value || '',
+        image_base64 : image_base64
+    };
+
+    try {
+        const res  = await fetch('/api/posts', {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body   : JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            closeModal('postModal'); // Đóng form đăng tin
+            document.getElementById('postForm').reset();
+            document.getElementById('imagePreview').style.display = 'none';
+            loadPosts(); // Tải lại danh sách từ DB
+
+            // --- KIỂM TRA KẾT QUẢ TỪ AI VÀ HIỂN THỊ BẢNG (MỚI) ---
+            if (data.matches && data.matches.length > 0) {
+                showAiMatchModal(data.matches, currentPostType); 
+            } else {
+                // Nếu AI không tìm ra ai trùng khớp thì báo thành công bình thường
+                alert("✅ Đăng tin thành công! Hệ thống sẽ thông báo nếu tìm thấy đồ.");
+            }
+            // -----------------------------------------------------
+
+        } else {
+            alert("❌ Lỗi: " + data.message);
+        }
+    } catch (err) {
+        alert("Không kết nối được server!");
+    } finally {
+        btn.innerText = '📮 Đăng tin';
+        btn.disabled = false;
+    }
+}
+// Hàm hiển thị Popup Kết quả AI (Đã nâng cấp thông báo thông minh)
+function showAiMatchModal(matches, postType) {
+    const modal = document.getElementById('aiMatchModal');
+    const listContainer = document.getElementById('aiMatchList');
+    const textElement = document.getElementById('aiMatchText');
+
+    // --- XỬ LÝ CÂU CHỮ TÙY THEO LOẠI TIN ---
+    if (postType === 'lost') {
+        // Nếu người dùng vừa đăng tin Báo Mất
+        textElement.innerHTML = `Hệ thống tìm thấy <strong>${matches.length}</strong> món đồ người khác nhặt được có khả năng là của bạn.`;
+    } else {
+        // Nếu người dùng vừa đăng tin Nhặt Được
+        textElement.innerHTML = `Tuyệt vời! Hệ thống tìm thấy <strong>${matches.length}</strong> người đang tìm kiếm món đồ giống hệt thế này.`;
+    }
+    
+    let html = '';
+    matches.forEach(m => {
+        html += `
+            <div style="border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-bottom: 10px;">
+                <h4 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 16px;">${m.item_name}</h4>
+                <div style="font-size: 14px; color: #555;">
+                    <span style="display:inline-block; background:#ffeaa7; padding:2px 8px; border-radius:10px; font-weight:bold; color:#d35400; font-size:12px;">Độ khớp: ${m.score.toFixed(0)}%</span>
+                    <span style="margin-left:10px;"><i class="fa-solid fa-location-dot"></i> Cách: ${m.distance_km} km</span>
+                </div>
+                <div style="font-size: 14px; color: #555; margin-top: 5px;">
+                    <i class="fa-solid fa-user"></i> Người đăng: <strong style="color: #3498db;">${m.contact_user}</strong>
+                </div>
+            </div>
+        `;
+    });
+    
+    // Bơm HTML vào khung và cho hiển thị lên
+    listContainer.innerHTML = html;
+    modal.style.display = 'flex';
+}
+
+// ── Load bài đăng từ DB thay vì mockData ─────────────────────────
+async function loadPosts(type = '', category = '', location = '') {
+    const grid = document.getElementById('itemsGrid');
+    grid.innerHTML = '<p style="text-align:center;color:#999;">Đang tải...</p>';
+
+    const url = `/api/posts?type=${type}&category=${category}&location=${location}`;
+
+    try {
+        const res   = await fetch(url);
+        const posts = await res.json();
+        
+        allPostsData = posts; // LƯU VÀO MẢNG ĐỂ DÙNG CHUNG CHO BẢN ĐỒ VÀ CHI TIẾT
+
+        if (posts.length === 0) {
+            grid.innerHTML = '<p style="text-align:center;color:#999;">Chưa có bài đăng nào.</p>';
+            return;
+        }
+        renderItems(posts);
+    } catch (err) {
+        grid.innerHTML = '<p style="text-align:center;color:red;">Lỗi tải dữ liệu!</p>';
+    }
+}
+
+// ── Lưu dữ liệu bài đăng vào map để dùng cho edit ───────────────
+let postsMap = {};
+
+// ── Hiển thị danh sách bài đăng (dùng dữ liệu từ DB) ─────────────
+function renderItems(data) {
+    const grid = document.getElementById('itemsGrid');
+    grid.innerHTML = '';
+    postsMap = {}; // reset map
+
+    data.forEach(item => {
+        postsMap[item.id] = item; // lưu vào map để openEditModal dùng
+
+        const badgeClass = item.type === 'lost' ? 'tag-lost' : 'tag-found';
+        const badgeText  = item.type === 'lost' ? '🔴 Đang tìm' : '🟢 Đã nhặt';
+        const imgSrc     = item.image_url || 'https://via.placeholder.com/300x180/ddd/999?text=No+Image';
+        const timeAgo    = formatTime(item.created_at);
+        const isOwner    = currentUser && currentUser.id === item.user_id;
+
+        // Thêm event.stopPropagation() để không bị dội sự kiện bấm vào Card
+        const ownerButtons = isOwner ? `
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                <button onclick="event.stopPropagation(); resolvePost(${item.id})"
+                    style="padding:6px 12px;background:#1DD1A1;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    ✅ Đã giải quyết
+                </button>
+                <button onclick="event.stopPropagation(); openEditModal(${item.id})"
+                    style="padding:6px 12px;background:#4A90E2;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    ✏️ Sửa
+                </button>
+                <button onclick="event.stopPropagation(); deletePost(${item.id})"
+                    style="padding:6px 12px;background:#FF6B6B;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    🗑️ Xóa
+                </button>
+            </div>` : '';
+
+        // Đã thêm sự kiện onclick="showPostDetail" vào từng thẻ bài viết
+        grid.innerHTML += `
+            <div class="card" data-id="${item.id}" onclick="showPostDetail(${item.id})" style="cursor: pointer;">
+                <span class="card-tag ${badgeClass}">${badgeText}</span>
+                <div class="card-img">
+                    <img src="${imgSrc}" alt="${item.item_name}">
+                </div>
+                <div class="card-body">
+                    <h3 class="card-title">${item.item_name}</h3>
+                    <div class="card-info"><i class="fa-solid fa-tag"></i> ${item.category || 'Không rõ'}</div>
+                    <div class="card-info"><i class="fa-solid fa-location-dot"></i> ${item.location}</div>
+                    <div class="card-info"><i class="fa-regular fa-calendar"></i> ${item.lost_date}</div>
+                    <div class="card-info"><i class="fa-regular fa-clock"></i> ${timeAgo}</div>
+                    ${item.description ? `<p style="font-size:13px;color:#888;margin-top:8px;">${item.description}</p>` : ''}
+                    ${ownerButtons}
+                </div>
+            </div>`;
+    });
+    if (typeof drawPinsOnMap === 'function') { drawPinsOnMap(data); }
+}
+
+// Biến toàn cục cho bản đồ chi tiết
+let detailMap;
+let detailMarker;
+
+// --- HÀM HIỂN THỊ CHI TIẾT BÀI ĐĂNG (CÓ TÍCH HỢP BẢN ĐỒ) ---
+function showPostDetail(postId) {
+    // 1. Tìm bài viết có ID tương ứng
+    const post = allPostsData.find(p => p.id === postId);
+    if (!post) return;
+
+    // 2. Bơm dữ liệu chữ vào Modal
+    document.getElementById('detailTitle').innerText = post.item_name;
+    document.getElementById('detailCategory').innerText = post.category || 'Không rõ';
+    document.getElementById('detailLocation').innerText = post.location;
+    document.getElementById('detailDate').innerText = post.lost_date || 'Không rõ';
+    document.getElementById('detailUser').innerText = post.username;
+    document.getElementById('detailDescription').innerText = post.description || 'Không có mô tả chi tiết.';
+
+    // 3. Xử lý Trạng thái
+    const statusSpan = document.getElementById('detailStatus');
+    statusSpan.innerText = post.type === 'lost' ? '🔴 Đang tìm' : '🟢 Đã nhặt được';
+    statusSpan.className = post.type === 'lost' ? 'card-tag tag-lost' : 'card-tag tag-found';
+
+    // 4. Xử lý Ảnh
+    const imgEl = document.getElementById('detailImage');
+    if (post.image_url) {
+        imgEl.src = post.image_url;
+        imgEl.style.display = 'inline-block';
+    } else {
+        imgEl.style.display = 'none';
+    }
+
+    // 5. Mở Modal lên
+    document.getElementById('postDetailModal').style.display = 'flex';
+
+    // 6. XỬ LÝ BẢN ĐỒ CHI TIẾT
+    setTimeout(() => {
+        const lat = parseFloat(post.latitude);
+        const lng = parseFloat(post.longitude);
+        const mapContainer = document.getElementById('detailMapContainer');
+
+        // Kiểm tra xem bài đăng này lúc đăng người ta có lưu tọa độ không
+        if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+            mapContainer.style.display = 'block'; // Hiện khung bản đồ
+
+            if (!detailMap) {
+                // Khởi tạo bản đồ lần đầu tiên
+                detailMap = L.map('detailMap').setView([lat, lng], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(detailMap);
+                
+                // Cắm cờ
+                detailMarker = L.marker([lat, lng]).addTo(detailMap);
+            } else {
+                // Các lần bấm sau chỉ cần dời cây cờ và đổi góc nhìn
+                detailMap.setView([lat, lng], 16);
+                detailMarker.setLatLng([lat, lng]);
+            }
+            
+            // Fix lỗi bản đồ bị xám mờ khi nằm trong Modal ẩn
+            detailMap.invalidateSize(); 
+        } else {
+            // Nếu bài viết cũ không có tọa độ -> Ẩn bản đồ đi cho đỡ trống
+            mapContainer.style.display = 'none';
+        }
+    }, 300); // Đợi 300ms cho Modal mở hẳn ra rồi mới load map
+}
+
+// ── Mở modal sửa ─────────────────────────────────────────────────
+function openEditModal(postId) {
+    const item = postsMap[postId];
+    if (!item) { alert('Không tìm thấy bài đăng!'); return; }
+
+    document.getElementById('editPostId').value      = postId;
+    document.getElementById('editItemName').value    = item.item_name;
+    document.getElementById('editCategory').value    = item.category || '';
+    document.getElementById('editLocation').value    = item.location;
+    document.getElementById('editDate').value        = item.lost_date;
+    document.getElementById('editDescription').value = item.description || '';
+    document.getElementById('editModal').style.display = 'flex';
+}
+
+// ── Gửi yêu cầu sửa lên server ───────────────────────────────────
+async function submitEdit() {
+    const postId = document.getElementById('editPostId').value;
+    const payload = {
+        user_id    : currentUser.id,
+        item_name  : document.getElementById('editItemName').value,
+        category   : document.getElementById('editCategory').value,
+        location   : document.getElementById('editLocation').value,
+        lost_date  : document.getElementById('editDate').value,
+        description: document.getElementById('editDescription').value
+    };
+
+    const res = await fetch(`/api/posts/${postId}`, {
+        method : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+        closeModal('editModal');
+        loadPosts();
+        alert('✅ Đã cập nhật bài đăng!');
+    } else {
+        alert('❌ Cập nhật thất bại!');
+    }
+}
+
+// ── Xóa bài đăng ─────────────────────────────────────────────────
+async function deletePost(postId) {
+    if (!confirm('Bạn có chắc muốn XÓA bài đăng này không?')) return;
+
+    const res = await fetch(`/api/posts/${postId}?user_id=${currentUser.id}`, {
+        method: 'DELETE'
+    });
+
+    if (res.ok) {
+        loadPosts();
+        alert('🗑️ Đã xóa bài đăng!');
+    } else {
+        alert('❌ Xóa thất bại!');
+    }
+}
+
+// ── Lọc theo tab ─────────────────────────────────────────────────
+function filterType(type) {
+    const t = type === 'all' ? '' : type;
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    loadPosts(t);
+}
+
+// ── Tìm kiếm ─────────────────────────────────────────────────────
+function filterItems() {
+    const keyword = (document.getElementById('searchInput')?.value || '').toLowerCase();
+    const allItems = Object.values(postsMap);
+
+    if (!keyword || allItems.length === 0) {
+        loadPosts();
+        return;
+    }
+
+    const filtered = allItems.filter(item =>
+        (item.item_name  || '').toLowerCase().includes(keyword) ||
+        (item.location   || '').toLowerCase().includes(keyword) ||
+        (item.category   || '').toLowerCase().includes(keyword)
+    );
+
+    if (filtered.length === 0) {
+        document.getElementById('itemsGrid').innerHTML =
+            '<p style="text-align:center;color:#999;">Không tìm thấy kết quả nào.</p>';
+    } else {
+        renderItems(filtered);
+    }
+}
+
+// ── Đánh dấu đã giải quyết ───────────────────────────────────────
+async function resolvePost(postId) {
+    if (!confirm("Đánh dấu bài này là ĐÃ GIẢI QUYẾT?")) return;
+    await fetch(`/api/posts/${postId}/resolve`, { method: 'PUT' });
+    loadPosts();
+}
+
+// ── Helper: format thời gian ──────────────────────────────────────
+function formatTime(dateStr) {
+    const diff = (Date.now() - new Date(dateStr)) / 1000;
+    if (diff < 60)    return 'Vừa xong';
+    if (diff < 3600)  return `${Math.floor(diff/60)} phút trước`;
+    if (diff < 86400) return `${Math.floor(diff/3600)} giờ trước`;
+    return `${Math.floor(diff/86400)} ngày trước`;
+}
+
+// Hàm hiển thị thông báo lỗi với animation
+function showErrorMessage(formId, message) {
+    const form = document.getElementById(formId);
+    let errorDiv = form.querySelector('.error-message');
+    
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        form.appendChild(errorDiv);
+    }
+    
+    errorDiv.textContent = '✗ ' + message;
+    errorDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 4000);
+}
+
+// Hàm hiển thị thông báo thành công với animation
+function showSuccessMessage(formId, message) {
+    const form = document.getElementById(formId);
+    let successDiv = form.querySelector('.success-message');
+    
+    if (!successDiv) {
+        successDiv = document.createElement('div');
+        successDiv.className = 'success-message';
+        form.appendChild(successDiv);
+    }
+    
+    successDiv.textContent = message;
+    successDiv.style.display = 'block';
+}
+
+// Kiểm tra độ mạnh mật khẩu
+function checkPasswordStrength(password) {
+    const registerForm = document.getElementById('registerForm');
+    let strengthBar = registerForm.querySelector('.password-strength-bar');
+    
+    if (!strengthBar) {
+        const strengthDiv = document.createElement('div');
+        strengthDiv.className = 'password-strength';
+        const bar = document.createElement('div');
+        bar.className = 'password-strength-bar';
+        strengthDiv.appendChild(bar);
+        
+        const passInput = document.getElementById('regPass');
+        passInput.parentElement.appendChild(strengthDiv);
+        strengthBar = bar;
+    }
+
+    strengthBar.className = 'password-strength-bar';
+    
+    if (password.length < 6) {
+        strengthBar.style.width = '33%';
+        strengthBar.style.background = '#FF6B6B';
+    } else if (password.length < 10 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        strengthBar.classList.add('medium');
+    } else {
+        strengthBar.classList.add('strong');
+    }
+}
+document.getElementById('locationFilter').addEventListener('keyup', filterItems);
+document.getElementById('startDate').addEventListener('change', filterItems);
+document.getElementById('endDate').addEventListener('change', filterItems);
+
+// --- HÀM LỌC SẢN PHẨM TRỰC TIẾP (FRONTEND) ---
+function filterItems() {
+    // 1. Lấy giá trị người dùng nhập vào
+    const searchText = document.getElementById('searchInput').value.toLowerCase();
+    const categoryDropdown = document.getElementById('filterCategory');
+    const categoryText = categoryDropdown.value !== 'all' ? categoryDropdown.options[categoryDropdown.selectedIndex].text.toLowerCase() : '';
+    const locationText = document.getElementById('locationFilter').value.toLowerCase();
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    // 2. Lấy tất cả các thẻ bài viết đang có trên trang
+    const cards = document.querySelectorAll('#itemsGrid .card');
+
+    cards.forEach(card => {
+        // Lấy dữ liệu nằm trong từng thẻ bài viết
+        const title = card.querySelector('.card-title').innerText.toLowerCase();
+        const infos = card.querySelectorAll('.card-info');
+        
+        const itemCategory = infos[0] ? infos[0].innerText.toLowerCase() : ''; // Thường là thẻ info đầu tiên
+        const itemLocation = infos[1] ? infos[1].innerText.toLowerCase() : ''; // Thường là thẻ info thứ hai
+        const itemDate = infos[2] ? infos[2].innerText : ''; // Thường là thẻ info thứ ba (Ngày)
+
+        let isMatch = true;
+
+        // Kiểm tra Tên
+        if (searchText && !title.includes(searchText)) isMatch = false;
+
+        // Kiểm tra Danh mục
+        if (categoryText && !itemCategory.includes(categoryText)) isMatch = false;
+
+        // Kiểm tra Khu vực
+        if (locationText && !itemLocation.includes(locationText)) isMatch = false;
+
+        // Kiểm tra Ngày (Nếu người dùng có chọn ngày)
+        if (startDate && itemDate < startDate) isMatch = false;
+        if (endDate && itemDate > endDate) isMatch = false;
+
+        // Ẩn/Hiện thẻ dựa trên kết quả
+        card.style.display = isMatch ? 'flex' : 'none';
+    });
+}
+
+// --- HÀM XÓA BỘ LỌC ---
+function clearFilters() {
+    // Reset toàn bộ input về rỗng
+    document.getElementById('searchInput').value = '';
+    document.getElementById('filterCategory').value = 'all';
+    document.getElementById('locationFilter').value = '';
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    
+    // Chạy lại hàm lọc để hiển thị tất cả các thẻ
+    filterItems();
+}
+let map;
+let marker;
+
+// Khởi tạo bản đồ Đăng tin (Có nút Tìm kiếm vị trí BẤT KỲ ĐÂU)
+function initMap() {
+    // Tọa độ lúc vừa mở Modal (Mặc định Đà Nẵng, nhưng lát tìm nó sẽ bay đi chỗ khác)
+    const defaultCoords = [16.0544, 108.2022]; 
+
+    map = L.map('map').setView(defaultCoords, 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    marker = L.marker(defaultCoords, {draggable: true}).addTo(map);
+
+    // Kéo thả cây cờ
+    marker.on('dragend', function (e) {
+        updateLocationFields(marker.getLatLng()); 
+    });
+
+    // Click vào bản đồ
+    map.on('click', function(e) {
+        marker.setLatLng(e.latlng);
+        updateLocationFields(e.latlng);
+    });
+
+    // --- XỬ LÝ KHI BẤM NÚT "TÌM VỊ TRÍ" ---
+    const btnSearch = document.getElementById('btnSearchMap');
+    const locationInput = document.getElementById('itemLocation');
+    
+    btnSearch.addEventListener('click', function() {
+        const address = locationInput.value;
+        if (!address) {
+            alert("Vui lòng nhập địa chỉ để tìm kiếm!");
+            return;
+        }
+
+        // Đổi chữ nút thành Đang tìm...
+        const originalText = btnSearch.innerHTML;
+        btnSearch.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        // Gọi API tìm địa chỉ BẤT KỲ ĐÂU ở Việt Nam
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=vn`)
+            .then(res => res.json())
+            .then(data => {
+                btnSearch.innerHTML = originalText; // Trả lại nút cũ
+
+                if (data && data.length > 0) {
+                    // Lấy tọa độ tìm được
+                    const lat = data[0].lat;
+                    const lng = data[0].lon;
+                    const latlng = [lat, lng];
+
+                    // Vút! Bản đồ bay đến vị trí mới và cắm cờ
+                    map.setView(latlng, 16);
+                    marker.setLatLng(latlng);
+
+                    // Lưu tọa độ ngầm để gửi cho Server
+                    updateLocationFields({lat: lat, lng: lng});
+                } else {
+                    // Cảnh báo nếu gõ chi tiết quá nó tìm không ra
+                    alert("Không tìm thấy! Vui lòng thử gõ ngắn gọn lại (VD: Tên đường + Tỉnh/Thành phố).");
+                }
+            })
+            .catch(err => {
+                btnSearch.innerHTML = originalText;
+                console.error("Lỗi:", err);
+            });
+    });
+}
+
+// Hàm cập nhật tọa độ 
+function updateLocationFields(coords) {
+    document.getElementById('latitude').value = coords.lat;
+    document.getElementById('longitude').value = coords.lng;
+}
+
+let isNewsLoaded = false; 
+// Hàm này được gọi tự động khi Google đăng nhập thành công
+// (Tên hàm phải trùng với data-callback bên HTML)
+function handleGoogleLogin(response) {
+    // 1. Giải mã token để lấy thông tin
+    const responsePayload = decodeJwtResponse(response.credential);
+
+    console.log("--- Google Login Success ---");
+    console.log("Tên: " + responsePayload.name);
+    console.log("Email: " + responsePayload.email);
+
+    // 2. Gửi thông tin về Python Flask (Backend)
+    // Lưu ý: Đảm bảo bạn đang dùng đúng tên hàm sendToBackend ở bên dưới code của bạn
+    sendSocialDataToServer('google', responsePayload.email, responsePayload.name);
+}
+
+// Giữ nguyên hàm giải mã này
+function decodeJwtResponse(token) {
+    var base64Url = token.split('.')[1];
+    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    var jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+}
+
+
+/* =========================================
+   PHẦN 2: XỬ LÝ FACEBOOK
+   ========================================= */
+
+// Khởi tạo SDK Facebook
+window.fbAsyncInit = function() {
+    FB.init({
+        appId      : '1321988713316028', // ID App của bạn
+        cookie     : true,
+        xfbml      : true,
+        version    : 'v18.0'
+    });
+};
+// Hàm này được gọi khi bấm nút Facebook (f)
+function loginFacebook() {
+    FB.login(function(response) {
+        if (response.status === 'connected') {
+            FB.api('/me', {fields: 'name, email'}, function(userData) {
+                console.log('FB User: ' + userData.name);
+                
+                // Gửi dữ liệu cho hàm xử lý chung
+                sendSocialDataToServer('facebook', userData.email, userData.name);
+            });
+        }
+    }, {scope: 'public_profile,email'});
+}
+
+
+/* =========================================
+   PHẦN 3: GỬI VỀ BACKEND (PYTHON FLASK)
+   ========================================= */
+
+function sendSocialDataToServer(provider, email, name) {
+    // Gọi API của Python Flask
+    fetch('/api/social-login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            provider: provider,
+            email: email,
+            name: name
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if(data.success) {
+            // 1. QUAN TRỌNG NHẤT: Lưu người dùng vào hệ thống
+            currentUser = data.user; 
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // 2. Thông báo và Đóng Modal
+            // alert("Đăng nhập bằng " + provider + " thành công!");
+            closeModal('authModal');
+            
+            // 3. Cập nhật giao diện (Biến nút Đăng nhập thành Xin chào...)
+            if (typeof updateUserArea === "function") {
+                updateUserArea(); 
+            } else {
+                window.location.reload(); // Nếu không có hàm updateUserArea thì load lại trang
+            }
+        } else {
+            alert("Lỗi: " + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Lỗi khi gửi lên server:', error);
+        alert("Không thể kết nối với máy chủ!");
+    });
+}
+
+// --- HÀM TẢI TIN TỨC (GIAO DIỆN MỚI CÓ ẢNH) ---
+function loadNews() {
+    // Biến flag để tránh tải lại nhiều lần (nếu bạn có logic đó)
+    if (window.isNewsLoaded) return; 
+
+    const container = document.getElementById("news-section");
+    if (!container) return; // Nếu không tìm thấy container thì thoát
+
+    // Gọi API lấy tin tức từ Backend Python
+    fetch("/api/news")
+        .then(res => {
+            if (!res.ok) throw new Error("Không thể kết nối API tin tức");
+            return res.json();
+        })
+        .then(data => {
+            // Nếu API trả về mảng rỗng
+            if (!data || data.length === 0) {
+                container.innerHTML = `
+                    <div style='text-align:center; grid-column:1/-1; color:#7f8c8d; padding:40px;'>
+                        <i class="fa-regular fa-face-frown" style="font-size:40px; margin-bottom:10px;">
+                        </i><br>Hiện tại không có tin tức mới nào.
+                    </div>`;
+                return;
+            }
+
+            let html = "";
+            
+            // Lặp qua từng bài tin và tạo HTML
+            data.forEach(n => {
+                // 1. Tự động xác định hình ảnh và nguồn dựa trên tiêu đề
+                const newsInfo = getNewsMetaData(n.title, n.url);
+                
+                // 2. Tạo thời gian đăng tải giả lập (để đẹp giao diện)
+                const timeAgo = Math.floor(Math.random() * 5) + 1; // 1-5 giờ trước
+
+                    html += `
+                        <div class="news-card">
+                            <div class="news-card-img">
+                                <img src="${newsInfo.imageUrl}" alt="${n.title}" loading="lazy">
+                                
+                            </div>
+                            
+                            <div class="news-card-body">
+                                <a href="${n.url}" target="_blank" class="news-card-title">
+                                    ${n.title}
+                                </a>
+                                <p class="news-card-description">
+                                    ${n.description}
+                                </p>
+                                <a href="${n.url}" target="_blank" class="btn-read-more">
+                                    Đọc chi tiết <i class="fa-solid fa-arrow-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                });
+
+            // Bơm HTML vào container
+            container.innerHTML = html;
+            window.isNewsLoaded = true; // Đánh dấu đã tải xong
+        })
+        .catch(error => {
+            // Hiển thị thông báo lỗi nếu fetch thất bại
+            container.innerHTML = `
+                <div style='color: #e74c3c; text-align: center; grid-column: 1 / -1; padding: 40px;'>
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:40px; margin-bottom:10px;"></i>
+                    <br>Đã xảy ra lỗi khi tải dữ liệu tin tức! Vui lòng thử lại sau.
+                </div>`;
+            console.error('Lỗi Fetch Tin tức:', error);
+        });
+}
+
+/**
+ * Hàm Helper: Tự động gán ảnh minh họa và tên nguồn dựa trên tiêu đề tin
+ * (Dùng ảnh thực tế từ Unsplash để đảm bảo đẹp và hợp lệ)
+ */
+function getNewsMetaData(title, url) {
+    const lowerTitle = title.toLowerCase();
+    
+    // Bộ sưu tập ảnh chất lượng cao (Source: Unsplash)
+    const images = {
+        tech: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=500&q=80',
+        space: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500&q=80',
+        news: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=500&q=80',
+        world: 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=500&q=80',
+        ai: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=500&q=80'
+    };
+
+    let data = {
+        imageUrl: images.news, // Mặc định là ảnh tin tức chung
+        source: 'Tin tức'
+    };
+
+    // Tự động chọn ảnh theo từ khóa trong tiêu đề
+    if (lowerTitle.includes('nasa') || lowerTitle.includes('space') || lowerTitle.includes('vũ trụ')) {
+        data.imageUrl = images.space;
+    } else if (lowerTitle.includes('apple') || lowerTitle.includes('ai') || lowerTitle.includes('công nghệ') || lowerTitle.includes('google')) {
+        data.imageUrl = images.ai;
+    } else if (lowerTitle.includes('chiến tranh') || lowerTitle.includes('quân sự') || lowerTitle.includes('israel')) {
+        data.imageUrl = images.world;
+    } else if (lowerTitle.includes('amazon') || lowerTitle.includes('giảm giá')) {
+        data.imageUrl = images.tech;
+    }
+
+    // Xác định tên nguồn
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.includes('pcmag')) data.source = 'PCMag';
+    else if (lowerUrl.includes('foxnews')) data.source = 'Fox News';
+    else if (lowerUrl.includes('reuters')) data.source = 'Reuters';
+    else if (lowerUrl.includes('vnexpress')) data.source = 'VnExpress';
+    else data.source = 'Tổng hợp';
+
+    return data;
+}
+// Tự động tải tin tức khi trang web load xong
+document.addEventListener("DOMContentLoaded", function() {
+    loadNews();
+});
+
+// Thêm hiệu ứng cuộn mượt cho toàn trang web
+document.documentElement.style.scrollBehavior = "smooth";
+
+// Tự động tải tin tức khi vừa vào trang
+document.addEventListener("DOMContentLoaded", function() {
+    loadNews();
+});
+
+// Fake AI Scan
+function fakeAIScan() {
+    document.getElementById('aiMessage').style.display = 'block';
+    document.getElementById('itemName').value = "Ví da nam";
+}
+
+// Utility
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+}
+
+// ===== Typing Animation cho Hero Text =====
+const texts = [
+  "Bạn đang tìm kiếm gì hôm nay?",
+  "Mất ví? Mất điện thoại?",
+  "Lost&Found giúp bạn tìm lại!"
+];
+
+let textIndex = 0;
+let charIndex = 0;
+let isDeleting = false;
+const typingSpeed = 80;
+const deletingSpeed = 40;
+const delayBetweenTexts = 1500;
+
+const typingElement = document.getElementById("typing-text");
+
+function typeEffect() {
+  const currentText = texts[textIndex];
+
+  if (!isDeleting) {
+    typingElement.textContent = currentText.substring(0, charIndex + 1);
+    charIndex++;
+
+    if (charIndex === currentText.length) {
+      setTimeout(() => isDeleting = true, delayBetweenTexts);
+    }
+  } else {
+    typingElement.textContent = currentText.substring(0, charIndex - 1);
+    charIndex--;
+
+    if (charIndex === 0) {
+      isDeleting = false;
+      textIndex = (textIndex + 1) % texts.length;
+    }
+  }
+
+  setTimeout(typeEffect, isDeleting ? deletingSpeed : typingSpeed);
+}
+
+typeEffect();
+
+// --- KHỞI CHẠY ---
+initAuth();   // Check đăng nhập
+loadPosts();  // ← Thay renderItems(mockData) bằng loadPosts() để tải từ DB
+
+// Lấy user từ localStorage
+const user = JSON.parse(localStorage.getItem("currentUser"));
+
+// Nếu user tồn tại và role là admin
+if (user && user.role === "admin") {
+    const adminBtn = document.getElementById("adminButton");
+    if (adminBtn) {
+        adminBtn.innerHTML =
+        `<button onclick="goAdmin()" class="btn-admin">
+            Admin Dashboard
+        </button>`;
+    }
+}
+function updateUserArea() {
+    const socialUser = localStorage.getItem('user');
+    const localUser = localStorage.getItem('currentUser');
+    
+    let dataToUse = null;
+    if (socialUser) {
+        dataToUse = JSON.parse(socialUser);
+        localStorage.setItem('currentUser', socialUser);
+    } else if (localUser) {
+        dataToUse = JSON.parse(localUser);
+    }
+
+    const userArea = document.getElementById('userArea');
+    if (!userArea) return;
+
+    if (dataToUse) {
+        // Giao diện Avatar + Mũi tên chuẩn
+        userArea.innerHTML = `
+            <div class="user-dropdown-container">
+                <div class="user-trigger" onclick="toggleDropdown(event)">
+                    <div class="user-avatar-circle">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <i class="fa-solid fa-chevron-down caret-icon"></i>
+                </div>
+                <div id="userDropdownMenu" class="dropdown-menu-box">
+                    <div class="menu-header">
+                        <strong>${dataToUse.username}</strong>
+                    </div>
+                    <hr>
+                    <button class="menu-item logout-red" onclick="handleLogout()">
+                        <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        // Giao diện khi chưa đăng nhập
+        userArea.innerHTML = `
+            <button class="btn-login" onclick="openAuthModal()">
+                <i class="fa-regular fa-user"></i> Đăng nhập
+            </button>
+        `;
+    }
+}
+
+function toggleDropdown(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById("userDropdownMenu");
+    if (menu) menu.classList.toggle("active");
+}
+
+window.addEventListener('click', function() {
+    const menu = document.getElementById("userDropdownMenu");
+    if (menu) menu.classList.remove("active");
+});
+
+const oldLogout = handleLogout;
+handleLogout = function() {
+    if(confirm("Bạn có chắc muốn đăng xuất?")) {
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('user');
+        currentUser = null;
+        window.location.reload();
+    }
+};
+
+window.addEventListener('load', function() {
+    updateUserArea();
+});
+// Hàm chuyển sang trang admin
+function goAdmin(){
+    window.location.href = "/admin";
+}
+// Hàm tải danh sách bài đăng từ API admin
+async function loadAdminPosts() {
+    const res = await fetch("/api/admin/posts");
+    const posts = await res.json();
+    const table = document.getElementById("postTable");
+
+    if(!table) return; // Fix lỗi nếu không phải trang admin
+
+    table.innerHTML = "";
+
+    posts.forEach(p => {
+        const typeText = p.type === 'lost' ? '<span style="color:red">Mất đồ</span>' : '<span style="color:green">Nhặt được</span>';
+        const statusText = p.status === 'active' ? 'Đang hiện' : 'Đã xong';
+
+        table.innerHTML += `
+            <tr>
+                <td>${p.id}</td>
+                <td>${p.username}</td>
+                <td>${typeText}</td>
+                <td>${p.item_name}</td>
+                <td><b>${statusText}</b></td>
+                <td>${p.created_at.split(' ')[0]}</td>
+                <td>
+                    <button class="btn-delete" onclick="adminDeletePost(${p.id})">
+                        Xóa tin
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+// Hàm Admin xóa bài viết
+async function adminDeletePost(id) {
+    if (!confirm("Xóa bài đăng này?")) return;
+
+    const res = await fetch(`/api/admin/posts/${id}`, {
+        method: "DELETE"
+    });
+
+    const data = await res.json();
+    alert(data.message);
+    loadAdminPosts();
+}
+
+// Gọi hàm này khi trang web vừa mở
+loadAdminPosts();

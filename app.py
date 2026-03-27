@@ -1,0 +1,431 @@
+from flask import Flask, request, jsonify, render_template, session
+from flask_cors import CORS
+from news import get_news
+from thefuzz import fuzz
+import base64, os, uuid
+import mysql.connector
+import math
+import re
+
+UPLOAD_FOLDER = 'static/uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+app = Flask(__name__)
+app.secret_key = "lost_found_secret_key_123"
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+CORS(app)
+
+def get_db_connection():
+    return mysql.connector.connect(
+        host='localhost',
+        user='root',
+        password='123456',
+        database='lost_found_db'
+    )
+
+@app.route('/admin')
+def admin():
+    return render_template('admin.html')
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password')
+    phone = data.get('phone')
+    region = data.get('region')
+    if not username or not password:
+        return jsonify({'message': 'Vui lòng cung cấp tên đăng nhập và mật khẩu'}), 400
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
+    existing_user = cursor.fetchone()
+    if existing_user:
+        return jsonify({'message': 'Username đã tồn tại'}), 400
+    sql = "INSERT INTO users (username, email, password, phone, region) VALUES (%s, %s, %s, %s, %s)"
+    cursor.execute(sql, (username, email, password, phone, region))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return jsonify({'message': 'Đăng ký thành công!'}), 201
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+    user = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    if user and user['password'] == password:
+        return jsonify({
+            "message": "Đăng nhập thành công!",
+            "user": {"username": user['username'], "id": user['id'], "email":user["email"],
+                     "role": user['role']
+    }
+        }), 200
+    else:
+        return jsonify({"message": "Sai tên đăng nhập hoặc mật khẩu!"}), 401
+
+@app.route("/api/news") 
+def api_news():
+        return jsonify(get_news())
+
+@app.route('/admin.html')
+def admin_page():
+    return render_template("admin.html")
+
+@app.route('/api/users')
+def get_all_users():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # 💡 Lệnh SQL mới: Lấy tất cả người dùng NGOẠI TRỪ tài khoản tên 'admin'
+    cursor.execute("SELECT * FROM users WHERE username != 'admin' ORDER BY id DESC")
+    
+    users = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    return jsonify(users)
+
+@app.route('/api/users/<int:id>', methods=['DELETE'])
+def delete_user(id):
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM users WHERE id=%s",(id,))
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({"message":"Đã xóa user"})
+
+# --- 1. HÀM TOÁN HỌC: Tính khoảng cách giữa 2 tọa độ (Công thức Haversine) ---
+def calculate_distance(lat1, lon1, lat2, lon2):
+    if not all([lat1, lon1, lat2, lon2]):
+        return 9999 # Trả về số rất lớn nếu 1 trong 2 bài thiếu tọa độ
+    try:
+        R = 6371 # Bán kính Trái Đất (km)
+        dlat = math.radians(float(lat2) - float(lat1))
+        dlon = math.radians(float(lon2) - float(lon1))
+        a = math.sin(dlat/2) * math.sin(dlat/2) + math.cos(math.radians(float(lat1))) \
+            * math.cos(math.radians(float(lat2))) * math.sin(dlon/2) * math.sin(dlon/2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        return R * c # Trả về số Kilomet
+    except ValueError:
+        return 9999
+
+# --- 2. THUẬT TOÁN TÌM BÀI TRÙNG KHỚP (MATCHING ALGORITHM) ---
+def find_matches_for_post(post_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # 1. Lấy bài viết vừa đăng
+    cursor.execute("SELECT * FROM posts WHERE id = %s", (post_id,))
+    new_post = cursor.fetchone()
+    if not new_post: return []
+
+    # 2. Xác định mục tiêu: Mất thì tìm Nhặt, Nhặt thì tìm Mất
+    target_type = 'found' if new_post['type'] == 'lost' else 'lost'
+
+    # 3. Lấy tất cả bài tiềm năng trong Database
+    cursor.execute("SELECT * FROM posts WHERE type = %s AND status = 'active'", (target_type,))
+    candidates = cursor.fetchall()
+
+    matches = []
+    for cand in candidates:
+        score = 0 # Điểm khởi điểm là 0 (Thang điểm 100)
+
+        # TIÊU CHÍ 1: Khớp Danh mục (Tối đa +40 điểm)
+        if new_post['category'] == cand['category']:
+            score += 40
+
+        # TIÊU CHÍ 2: Logic Thời gian (Tối đa +20 điểm)
+        try:
+            if new_post['type'] == 'lost' and cand['lost_date'] >= new_post['lost_date']:
+                score += 20 # Bị mất trước, nhặt được sau -> Hợp lý
+            elif new_post['type'] == 'found' and new_post['lost_date'] >= cand['lost_date']:
+                score += 20 # Nhặt được sau ngày mất -> Hợp lý
+        except Exception: pass
+
+        # TIÊU CHÍ 3: Khoảng cách địa lý (Tối đa +20 điểm)
+        dist = calculate_distance(new_post['latitude'], new_post['longitude'], cand['latitude'], cand['longitude'])
+        if dist <= 3:      score += 20 # Cách nhau dưới 3km -> Tuyệt vời
+        elif dist <= 10:   score += 10 # Cách nhau dưới 10km -> Tạm ổn
+
+        # TIÊU CHÍ 4: Khớp Từ khóa (Tối đa +20 điểm)
+        def get_words(text):
+            if not text: return set()
+            # Cắt các từ dài hơn 2 ký tự (bỏ qua a, an, the, là, có...)
+            return set(re.findall(r'\b\w{3,}\b', str(text).lower()))
+
+# TIÊU CHÍ 4: Khớp Từ khóa thông minh bằng AI (Fuzzy Matching - Tối đa +20 điểm)
+        # Nối tên và mô tả lại thành một đoạn văn dài để phân tích
+        new_text = str(new_post['item_name']) + " " + str(new_post['description'])
+        cand_text = str(cand['item_name']) + " " + str(cand['description'])
+        
+        # Hàm token_set_ratio cực kỳ thông minh: 
+        # Bỏ qua hoa thường, bỏ qua thứ tự từ, chịu được lỗi chính tả nhẹ.
+        # Trả về điểm từ 0 đến 100 (100 là giống hệt nhau về mặt ý nghĩa)
+        similarity_percent = fuzz.token_set_ratio(new_text.lower(), cand_text.lower())
+        
+        # Quy đổi phần trăm (0-100) ra thang điểm 20 của hệ thống
+        # Ví dụ: Giống 90% -> (90 / 100) * 20 = 18 điểm
+        score += (similarity_percent / 100) * 20
+        # KẾT LUẬN: Nếu trên 60 điểm thì đưa vào danh sách "Có thể là đồ của bạn"
+        if score >= 60:
+            matches.append({
+                'post_id': cand['id'],
+                'item_name': cand['item_name'],
+                'score': score,
+                'contact_user': cand['username'],
+                'distance_km': round(dist, 1) if dist != 9999 else "Không rõ"
+            })
+
+    cursor.close()
+    conn.close()
+
+    # Sắp xếp lại: Đứa nào điểm cao nhất đứng đầu
+    return sorted(matches, key=lambda x: x['score'], reverse=True)
+# ── SỬA ĐỔI: Tích hợp lưu Map (latitude, longitude) ───────────────────
+@app.route('/api/posts', methods=['POST'])
+def create_post():
+    data = request.get_json()
+    
+    # Nhận ảnh base64 và lưu thành file
+    image_url = None
+    if data.get('image_base64'):
+        img_data = data['image_base64'].split(',')[1]  # Bỏ phần "data:image/...;base64,"
+        filename = f"{uuid.uuid4().hex}.jpg"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        with open(filepath, 'wb') as f:
+            f.write(base64.b64decode(img_data))
+        image_url = f"/static/uploads/{filename}"
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Đã thêm latitude và longitude vào câu lệnh SQL
+    sql = """
+        INSERT INTO posts (user_id, username, type, item_name, category,
+                           location, latitude, longitude, lost_date, description, image_url, secret_detail)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    cursor.execute(sql, (
+        data['user_id'], data['username'], data['type'],
+        data['item_name'], data['category'], data['location'],
+        data.get('latitude', ''), data.get('longitude', ''),  # Truyền tọa độ vào DB
+        data['lost_date'], data['description'],
+        image_url, data.get('secret_detail', '')
+    ))
+    conn.commit()
+    new_id = cursor.lastrowid
+    cursor.close()
+    conn.close()
+    matched_items = find_matches_for_post(new_id)
+
+    # Trả về kết quả cho web
+    return jsonify({
+        'message': 'Đăng tin thành công!', 
+        'id': new_id,
+        'matches': matched_items
+    }), 201
+# ── Lấy danh sách bài đăng (có lọc) ──────────────────────────────
+@app.route('/api/posts', methods=['GET'])
+def get_posts():
+    type_filter   = request.args.get('type', '')       # lost | found | ''
+    category      = request.args.get('category', '')
+    location      = request.args.get('location', '')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # Thêm việc trả về latitude và longitude để hiển thị chi tiết (nếu cần)
+    sql = """SELECT id, user_id, username, type, item_name, category,
+                    location, latitude, longitude, lost_date, description, image_url,
+                    -- KHÔNG trả về secret_detail ở đây (bảo mật)
+                    status, created_at
+             FROM posts WHERE status = 'active'"""
+    params = []
+    if type_filter:
+        sql += " AND type = %s";      params.append(type_filter)
+    if category:
+        sql += " AND category = %s";  params.append(category)
+    if location:
+        sql += " AND location LIKE %s"; params.append(f"%{location}%")
+    sql += " ORDER BY created_at DESC"
+
+    cursor.execute(sql, params)
+    posts = cursor.fetchall()
+    
+    # Chuyển date sang string cho JSON
+    for p in posts:
+        if p['lost_date']:
+            p['lost_date'] = str(p['lost_date'])
+        if p['created_at']:
+            p['created_at'] = str(p['created_at'])
+    
+    cursor.close(); conn.close()
+    return jsonify(posts)
+
+
+# ── Đánh dấu "Đã giải quyết" ─────────────────────────────────────
+@app.route('/api/posts/<int:post_id>/resolve', methods=['PUT'])
+def resolve_post(post_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE posts SET status='resolved' WHERE id=%s", (post_id,))
+    conn.commit()
+    cursor.close(); conn.close()
+    return jsonify({'message': 'Đã cập nhật trạng thái!'})
+
+
+# ── Lấy secret_detail (chỉ dùng khi xác minh chủ sở hữu) ─────────
+@app.route('/api/posts/<int:post_id>/secret', methods=['GET'])
+def get_secret(post_id):
+    # Chỉ người đăng nhập mới gọi được
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'message': 'Không có quyền'}), 403
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT secret_detail FROM posts WHERE id=%s", (post_id,))
+    row = cursor.fetchone()
+    cursor.close(); conn.close()
+    return jsonify(row)
+
+@app.route('/api/social-login', methods=['POST'])
+def social_login():
+    data = request.json
+    provider = data.get('provider')  # 'google' hoặc 'facebook'
+    email = data.get('email')
+    fullname = data.get('name')
+    
+    if not email:
+        return jsonify({"success": False, "message": "Không lấy được email"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # 1. Kiểm tra xem email đã tồn tại trong bảng users chưa
+    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+    user = cursor.fetchone()
+
+    if user:
+        # Trường hợp đã có tài khoản: Đăng nhập luôn
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+        res_user = user
+        msg = "Đăng nhập thành công"
+    else:
+        # Trường hợp chưa có: Tự động đăng ký
+        # Tạo username bằng phần đầu của email (ví dụ: hieu.phan)
+        new_username = email.split('@')[0]
+        
+        # Kiểm tra xem username này có bị trùng không (nếu trùng thêm đuôi ngẫu nhiên)
+        cursor.execute("SELECT id FROM users WHERE username = %s", (new_username,))
+        if cursor.fetchone():
+            new_username = f"{new_username}_{uuid.uuid4().hex[:4]}"
+
+        sql = "INSERT INTO users (username, email, password, phone, region, role) VALUES (%s, %s, %s, %s, %s, %s)"
+        # Password để trống hoặc gán mặc định vì xác thực qua Google rồi
+        cursor.execute(sql, (new_username, email, 'social_auth_no_password', '0000000000', 'Chưa cập nhật', 'user'))
+        conn.commit()
+        
+        # Lấy lại thông tin user vừa tạo
+        new_id = cursor.lastrowid
+        cursor.execute("SELECT * FROM users WHERE id = %s", (new_id,))
+        res_user = cursor.fetchone()
+        
+        session['user_id'] = res_user['id']
+        session['username'] = res_user['username']
+        msg = "Tạo tài khoản và đăng nhập thành công"
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        "success": True, 
+        "message": msg,
+        "user": {
+            "username": res_user['username'],
+            "id": res_user['id'],
+            "email": res_user['email'],
+            "role": res_user['role']
+        }
+    }), 200
+
+# ── Sửa bài đăng ─────────────────────────────────────────────────
+@app.route('/api/posts/<int:post_id>', methods=['PUT'])
+def update_post(post_id):
+    data = request.get_json()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    sql = """UPDATE posts SET item_name=%s, category=%s, location=%s,
+                              lost_date=%s, description=%s
+             WHERE id=%s AND user_id=%s"""
+    cursor.execute(sql, (
+        data['item_name'], data['category'], data['location'],
+        data['lost_date'], data['description'],
+        post_id, data['user_id']
+    ))
+    conn.commit()
+    cursor.close(); conn.close()
+    return jsonify({'message': 'Cập nhật thành công!'})
+
+
+# ── Xóa bài đăng ─────────────────────────────────────────────────
+@app.route('/api/posts/<int:post_id>', methods=['DELETE'])
+def delete_post(post_id):
+    user_id = request.args.get('user_id')
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Chỉ cho xóa nếu đúng chủ bài hoặc admin
+    cursor.execute("DELETE FROM posts WHERE id=%s AND user_id=%s", (post_id, user_id))
+    conn.commit()
+    cursor.close(); conn.close()
+    return jsonify({'message': 'Đã xóa bài đăng!'})
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
+
+# API lấy tất cả bài đăng cho Admin
+@app.route('/api/admin/posts')
+def admin_get_all_posts():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    # Lấy tất cả bài viết, sắp xếp mới nhất lên đầu
+    cursor.execute("SELECT id, username, type, item_name, category, location, status, created_at FROM posts ORDER BY created_at DESC")
+    posts = cursor.fetchall()
+    
+    for p in posts:
+        p['created_at'] = str(p['created_at'])
+        
+    cursor.close(); conn.close()
+    return jsonify(posts)
+
+# API Admin xóa bài đăng (không cần check user_id như User thường)
+@app.route('/api/admin/posts/<int:post_id>', methods=['DELETE'])
+def admin_delete_post(post_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM posts WHERE id=%s", (post_id,))
+    conn.commit()
+    cursor.close(); conn.close()
+    return jsonify({'message': 'Admin đã xóa bài đăng thành công!'})

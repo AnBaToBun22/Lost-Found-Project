@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost & Found - Hệ thống Tìm đồ thất lạc</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+</head>
+
+<body>
+
+<nav class="navbar" style="position: fixed; top: 0; left: 0; width: 100%; height: 60px; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; padding: 0 16px; box-sizing: border-box; z-index: 1000;">
+        
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <a href="/" class="logo" style="text-decoration: none; color: #2c3e50; font-size: 24px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-magnifying-glass-location" style="color: #3498db;"></i>
+                <span>Lost&Found</span>
+            </a>
+            
+            <div style="background: #f0f2f5; border-radius: 50px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; margin-left: 10px;">
+                <i class="fa-solid fa-search" style="color: #65676b;"></i>
+                <input type="text" id="fbSearchInput" placeholder="Tìm kiếm trên Lost&Found" onkeyup="document.getElementById('searchInput').value = this.value; filterItems();" style="border: none; background: transparent; outline: none; width: 220px; font-size: 14px;">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 5px; flex: 1; justify-content: center; max-width: 600px; height: 100%;">
+            <a href="/" style="width: 110px; display: flex; align-items: center; justify-content: center; border-bottom: 3px solid #3498db; color: #3498db; text-decoration: none;">
+                <i class="fa-solid fa-house" style="font-size: 24px;"></i>
+            </a>
+            <a href="#news-container" style="width: 110px; display: flex; align-items: center; justify-content: center; color: #65676b; text-decoration: none; border-bottom: 3px solid transparent; transition: 0.2s;" onmouseover="this.style.backgroundColor='#f0f2f5'; this.style.borderRadius='8px'; this.style.margin='5px 0';" onmouseout="this.style.backgroundColor='transparent'; this.style.margin='0';">
+                <i class="fa-regular fa-newspaper" style="font-size: 24px;"></i>
+            </a>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-end;">
+            <div id="adminButton"></div>
+            
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: #e4e6eb; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #050505; font-size: 20px;">
+                <i class="fa-solid fa-comment-dots"></i>
+            </div>
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: #e4e6eb; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #050505; font-size: 20px;">
+                <i class="fa-solid fa-bell"></i>
+            </div>
+            
+            <div class="user-area" id="userArea">
+                <button class="btn-login" onclick="openAuthModal()" style="background: #e4e6eb; border: none; color: #050505; font-weight: 600; padding: 8px 15px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <i class="fa-regular fa-user"></i> Đăng nhập
+                </button>
+            </div>
+        </div>
+    </nav>
+<div class="fb-layout">
+        
+        <aside class="fb-sidebar-left" style="width: 320px;">
+            <div class="fb-menu-item" style="background: #e6f2ff; color: #3498db;">
+                <i class="fa-solid fa-house"></i> Bảng Feed
+            </div>
+            <div class="fb-menu-item" onclick="toggleMainMap()">
+                <i class="fa-solid fa-map-location-dot" style="color: #27ae60;"></i> Bản đồ tổng
+            </div>
+            <a href="#news-container" class="fb-menu-item" style="text-decoration: none;">
+                <i class="fa-regular fa-newspaper" style="color: #e67e22;"></i> Tin tức
+            </a>
+
+            <hr style="border:0; border-top:1px solid #ccc; margin: 15px 0;">
+
+            <div class="fb-menu-item" onclick="toggleFbMenu()">
+                <i class="fa-solid fa-chevron-down" style="background: #e4e6eb; color: #050505; border-radius: 50%; padding: 5px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-right: -5px;"></i> 
+                Xem thêm
+            </div>
+            
+            <div id="fbHiddenMenu" style="display: none; padding-left: 10px; border-left: 2px solid #ddd; margin-left: 20px; margin-top: 5px;">
+                <div class="fb-menu-item" onclick="alert('Tính năng cài đặt đang được phát triển!')">
+                    <i class="fa-solid fa-gear" style="color: #555;"></i> Cài đặt
+                </div>
+                <div class="fb-menu-item" onclick="handleLogout()">
+                    <i class="fa-solid fa-right-from-bracket" style="color: #e74c3c;"></i> Đăng xuất
+                </div>
+            </div>
+
+            <div id="mainMapContainer" style="display: none; width: 100%; margin-top: 20px; padding: 12px; background: white; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); box-sizing: border-box;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <strong style="color: #2c3e50; font-size: 15px;"><i class="fa-solid fa-map"></i> Bản đồ khu vực</strong>
+                    <button onclick="toggleMainMap()" style="border: none; background: #e4e6eb; color: #050505; border-radius: 50%; cursor: pointer; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; transition: 0.2s;" onmouseover="this.style.background='#d8dadf'" onmouseout="this.style.background='#e4e6eb'">&times;</button>
+                </div>
+                <div id="mainMap" style="height: 380px; width: 100%; border-radius: 8px; z-index: 1; border: 1px solid #ddd;"></div>
+            </div>
+
+        </aside>
+
+        <main class="fb-feed">
+            
+            <div class="fb-box" style="padding: 12px 15px; margin-bottom: 15px;">
+                <div style="display: flex; gap: 10px; align-items: center; cursor: pointer; margin-bottom: 10px;" onclick="checkLoginBeforeAction('lost')">
+                    <div style="width: 36px; height: 36px; border-radius: 50%; background: #ccc; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white;">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div style="flex: 1; background: #f0f2f5; padding: 8px 15px; border-radius: 20px; color: #65676b; font-size: 14px;">
+                        Bạn đã đánh rơi hoặc nhặt được đồ gì?
+                    </div>
+                </div>
+                <hr style="border:0; border-top:1px solid #eee; margin: 8px 0;">
+                <div style="display: flex; justify-content: space-between; gap: 10px;">
+                    <button onclick="checkLoginBeforeAction('lost')" style="flex: 1; padding: 8px; background: transparent; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; color: #65676b; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s;" onmouseover="this.style.background='#f0f2f5'" onmouseout="this.style.background='transparent'">
+                        <i class="fa-solid fa-circle-minus" style="color: #e74c3c; font-size: 18px;"></i> Báo Mất Đồ
+                    </button>
+                    <button onclick="checkLoginBeforeAction('found')" style="flex: 1; padding: 8px; background: transparent; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; color: #65676b; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s;" onmouseover="this.style.background='#f0f2f5'" onmouseout="this.style.background='transparent'">
+                        <i class="fa-solid fa-circle-plus" style="color: #2ecc71; font-size: 18px;"></i> Báo Nhặt Được
+                    </button>
+                </div>
+            </div>
+
+            <div class="tabs" style="justify-content: flex-start; background: transparent; padding: 0; box-shadow: none; margin-bottom: 15px;">
+                <button class="tab-btn active" onclick="filterType('all')">Tất cả</button>
+                <button class="tab-btn" onclick="filterType('lost')">Đang tìm</button>
+                <button class="tab-btn" onclick="filterType('found')">Đã nhặt được</button>
+            </div>
+
+            <div id="itemsGrid" class="items-grid fb-style-grid"></div>
+            
+        </main>
+
+        <aside class="fb-sidebar-right">
+            <div class="fb-box">
+                <h3 style="margin-top: 0; color: #050505; font-size: 16px; margin-bottom: 15px;"><i class="fa-solid fa-filter"></i> Bộ lọc chi tiết</h3>
+                
+                <input type="hidden" id="searchInput"> 
+                
+                <select id="filterCategory" onchange="filterItems()" class="fb-input">
+                    <option value="all">Tất cả danh mục</option>
+                    <option value="wallet">Ví tiền</option>
+                    <option value="electronics">Điện tử</option>
+                    <option value="documents">Giấy tờ</option>
+                    <option value="laptop">Laptop/Tablet</option>
+                    <option value="phone">Điện thoại</option>
+                    <option value="other">Khác</option>
+                </select>
+
+                <input type="text" id="locationFilter" placeholder="📍 Lọc theo khu vực..." onkeyup="filterItems()" class="fb-input">
+                
+                <label style="font-size: 12px; color: #65676b; font-weight: 600; margin-bottom: 5px; display: block;">Thời gian:</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="date" id="startDate" class="fb-input" onchange="filterItems()" style="margin-bottom: 0;">
+                    <input type="date" id="endDate" class="fb-input" onchange="filterItems()" style="margin-bottom: 0;">
+                </div>
+
+                <button onclick="clearFilters()" style="width: 100%; margin-top: 15px; padding: 10px; background: #e4e6eb; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#d8dadf'" onmouseout="this.style.background='#e4e6eb'">Xóa bộ lọc</button>
+            </div>
+            
+            <div style="font-size: 12px; color: #65676b; margin-top: 10px;">
+                Lost & Found System © 2026<br>Thiết kế dạng Newsfeed.
+            </div>
+        </aside>
+
+    </div>
+    <div class="container" id="news-container" style="margin-top: 20px; padding-top: 30px; border-top: 2px dashed #ccc; max-width: 1300px; margin-left: auto; margin-right: auto;">
+        <h2 style="text-align: center; color: #2c3e50; margin-bottom: 25px;">
+            <i class="fa-regular fa-newspaper" style="color: #3498db;"></i> Tin Tức & Cập Nhật Mới Nhất
+        </h2>
+        
+        <div id="news-section" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <div style='text-align:center; grid-column: 1 / -1; color: #7f8c8d;'>
+                <i class='fa-solid fa-spinner fa-spin'></i> Đang tải tin tức...
+            </div>
+        </div>
+    </div>
+
+<div id="postModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('postModal')">&times;</span>
+            <h2 id="modalTitle">Đăng tin</h2>
+
+            <form id="postForm" onsubmit="handlePost(event)">
+
+            <div class="form-group">
+                <label>Loại đồ vật *</label>
+                <select id="itemCategory" required style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                <option value="">-- Chọn loại --</option>
+                <option value="Ví / Túi">Ví / Túi</option>
+                <option value="Điện thoại">Điện thoại</option>
+                <option value="Chìa khóa">Chìa khóa</option>
+                <option value="CCCD / Giấy tờ">CCCD / Giấy tờ</option>
+                <option value="Laptop / Tablet">Laptop / Tablet</option>
+                <option value="Khác">Khác</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Tên / Mô tả ngắn *</label>
+                <input type="text" id="itemName" placeholder="VD: Ví da nam màu đen" required>
+            </div>
+
+            <div class="form-group" style="display: block;">
+                <label>📍 Khu vực rơi / nhặt *</label>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 10px; width: 100%;">
+                    <input type="text" id="itemLocation" placeholder="VD: Cầu Rồng, Đà Nẵng..." required style="flex: 1; margin: 0; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box;">
+                    <button type="button" id="btnSearchMap" style="padding: 0 15px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; white-space: nowrap;">
+                        <i class="fa-solid fa-location-crosshairs"></i> Tìm vị trí
+                    </button>
+                </div>
+                
+                <label style="font-size: 13px; color: #777; display: block; margin-bottom: 8px;">* Bản đồ sẽ nhảy đến vị trí bạn tìm (có thể kéo cây cờ để chỉnh chính xác hơn):</label>
+                <div id="map" style="height: 250px; width: 100%; border-radius: 8px; margin-bottom: 10px; z-index: 1; border: 1px solid #ddd;"></div>
+                
+                <input type="hidden" id="latitude">
+                <input type="hidden" id="longitude">
+            </div>
+
+            <div class="form-group">
+                <label>Ngày mất / nhặt *</label>
+                <input type="date" id="itemDate" required>
+            </div>
+
+            <div class="form-group">
+                <label>Mô tả chi tiết</label>
+                <textarea id="itemDescription" rows="3" placeholder="Màu sắc, đặc điểm nhận dạng..." 
+                        style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;"></textarea>
+            </div>
+
+            <div class="form-group" id="secretGroup" style="display:none;">
+                <label>🔒 Thông tin xác minh chủ (ẩn với công khai)</label>
+                <input type="text" id="itemSecret" 
+                    placeholder="VD: Trong ví có thẻ ngân hàng tên Nguyễn Văn A">
+                <small style="color:#999;">Chỉ bạn và người liên hệ hợp lệ mới thấy thông tin này</small>
+            </div>
+
+            <div class="form-group">
+                <label>Hình ảnh minh họa</label>
+                <div class="upload-btn-wrapper">
+                <button class="btn-upload" type="button">
+                    <i class="fa-solid fa-camera"></i> Chọn ảnh
+                </button>
+                <input type="file" id="itemImage" accept="image/*" onchange="previewImage(event)">
+                </div>
+                <img id="imagePreview" src="" alt="" 
+                    style="display:none;width:100%;max-height:150px;object-fit:cover;border-radius:8px;margin-top:8px;">
+            </div>
+
+            <button type="submit" class="btn-submit">📮 Đăng tin</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="authModal" class="modal">
+        <div class="modal-content auth-content">
+            <span class="close" onclick="closeModal('authModal')">&times;</span>
+
+<div id="loginForm">
+    <h2>Đăng Nhập</h2>
+
+    <div class="form-group input-wrapper">
+        <i class="fa fa-user input-icon"></i>
+        <input type="text" id="loginUser" placeholder="Tên đăng nhập">
+    </div>
+
+    <div class="form-group input-wrapper">
+        <i class="fa fa-lock input-icon"></i>
+        <input type="password" id="loginPass" placeholder="Mật khẩu">
+    </div>
+
+    <button class="btn-submit" onclick="handleLogin()" style="width: 100%; margin-top: 10px;">Đăng Nhập</button>
+
+    <div class="social-login-wrapper" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+        <p style="font-size: 13px; color: #888; margin-bottom: 12px; text-align: center;">Hoặc đăng nhập bằng:</p>
+        
+        <div class="social-buttons" style="display: flex; justify-content: center; align-items: center; gap: 20px;">
+            <div id="g_id_onload"
+                 data-client_id="728227859743-0dhagnv7r3816n107vlv2eqfr5ar7mgh.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleLogin"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin" data-type="icon" data-shape="circle" data-theme="outline" data-size="large"></div>
+
+            <button id="fb-btn" type="button" onclick="loginFacebook()" style="width: 40px; height: 40px; background-color: #1877F2; color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <i class="fa-brands fa-facebook-f"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="auth-links" style="margin-top: 15px; text-align: center; font-size: 13px;">
+        <a href="#" onclick="switchAuth('forgot')">Quên mật khẩu?</a> |
+        <a href="#" onclick="switchAuth('register')">Đăng ký mới</a>
+    </div>
+</div>
+
+            <div id="registerForm" style="display: none;">
+                <h2>Đăng Ký</h2>
+                <div class="form-group input-wrapper">
+                    <i class="fa fa-user input-icon"></i>
+                    <input type="text" id="regUser" placeholder="Tên đăng nhập mới" required>
+                </div>
+                <div class="form-group input-wrapper">
+                    <i class="fa fa-envelope input-icon"></i>
+                    <input type="email" id="regEmail" placeholder="Email sinh viên" required>
+                </div>
+                <div class="form-group input-wrapper">
+                    <i class="fa fa-lock input-icon"></i>
+                    <input type="password" id="regPass" placeholder="Mật khẩu" required onkeyup="checkPasswordStrength(this.value)">
+                </div>
+                <div class="form-group input-wrapper">
+                    <i class="fa fa-phone input-icon"></i>
+                    <input type="text" id="regPhone" placeholder="Số điện thoại" required>
+                </div>
+                <div class="form-group input-wrapper">
+                    <i class="fa fa-map-marker-alt input-icon"></i>
+                    <select id="regRegion" required style="width: 100%; padding: 12px 12px 12px 40px; border-radius: 8px; border: 1px solid #ddd; outline: none; box-sizing: border-box; background: #f9f9f9; color: #555;">
+                        <option value="" disabled selected>Chọn khu vực của bạn...</option>
+                        <option value="Đà Nẵng">Đà Nẵng</option>
+                        <option value="Hà Nội">Hà Nội</option>
+                        <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
+                        <option value="Hải Phòng">Hải Phòng</option>
+                        <option value="Cần Thơ">Cần Thơ</option>
+                        <option value="Thừa Thiên Huế">Thừa Thiên Huế</option>
+                        <option value="Quảng Nam">Quảng Nam</option>
+                        <option value="Nghệ An">Nghệ An</option>
+                        <option value="Khánh Hòa">Khánh Hòa</option>
+                        <option value="Lâm Đồng">Lâm Đồng</option>
+                        <option value="Bình Dương">Bình Dương</option>
+                        <option value="Đồng Nai">Đồng Nai</option>
+                    </select>
+                </div>
+                <button class="btn-submit" onclick="handleRegister()">Tạo Tài Khoản</button>
+                <div class="auth-links">
+                    <a href="#" onclick="switchAuth('login')">Quay lại Đăng nhập</a>
+                </div>
+            </div>
+
+            <div id="forgotForm" style="display: none;">
+                <h2>Khôi phục mật khẩu</h2>
+                <p style="font-size: 14px; color: #666; margin-bottom: 15px;">Nhập email của bạn, chúng tôi sẽ gửi mã OTP.</p>
+                <div class="form-group input-wrapper">
+                    <i class="fa fa-envelope input-icon"></i>
+                    <input type="email" id="forgotEmail" placeholder="Email của bạn">
+                </div>
+                <button class="btn-submit" onclick="handleForgot()">Gửi Yêu Cầu</button>
+                <div class="auth-links">
+                    <a href="#" onclick="switchAuth('login')">Quay lại</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+<div id="aiMatchModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 450px; text-align: center; background: #e0faff; border-radius: 15px; border: 2px solid #1dd1a1;">
+        <h3 style="color: #2c3e50; margin-top: 0;">
+        <i class="fa-solid fa-bell">
+            
+        </i> KẾT QUẢ TỰ ĐỘNG!</h3>
+        <p id="aiMatchText" style="color: #555;">Hệ thống tìm thấy <strong>1</strong> món đồ có độ trùng khớp cao.</p>
+        
+        <div id="aiMatchList" style="text-align: left; background: white; padding: 15px; border-radius: 10px; margin: 15px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+            </div>
+
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button class="btn-submit" onclick="closeModal('aiMatchModal')" style="background: #1dd1a1; border: none; padding: 10px 20px; border-radius: 30px; color: white; cursor: pointer;">Tuyệt vời, Đóng lại</button>
+        </div>
+    </div>
+</div>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('editModal')">&times;</span>
+            <h2 style="color:#4A90E2;">✏️ Sửa bài đăng</h2>
+            <input type="hidden" id="editPostId">
+            <div class="form-group">
+                <label>Loại đồ vật</label>
+                <select id="editCategory" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;">
+                    <option value="Ví / Túi">Ví / Túi</option>
+                    <option value="Điện thoại">Điện thoại</option>
+                    <option value="Chìa khóa">Chìa khóa</option>
+                    <option value="CCCD / Giấy tờ">CCCD / Giấy tờ</option>
+                    <option value="Laptop / Tablet">Laptop / Tablet</option>
+                    <option value="Khác">Khác</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Tên / Mô tả ngắn</label>
+                <input type="text" id="editItemName">
+            </div>
+            <div class="form-group">
+                <label>Khu vực</label>
+                <input type="text" id="editLocation">
+            </div>
+            <div class="form-group">
+                <label>Ngày mất / nhặt</label>
+                <input type="date" id="editDate">
+            </div>
+            <div class="form-group">
+                <label>Mô tả chi tiết</label>
+                <textarea id="editDescription" rows="3"
+                    style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;"></textarea>
+            </div>
+            <button class="btn-submit" onclick="submitEdit()">💾 Lưu thay đổi</button>
+        </div>
+    </div>
+
+
+    <div id="postDetailModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close" onclick="closeModal('postDetailModal')">&times;</span>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+                <h2 id="detailTitle" style="color: #2c3e50; margin: 0;">Tên đồ vật</h2>
+                <span id="detailStatus" class="card-tag">Trạng thái</span>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 15px;">
+                <img id="detailImage" src="" alt="Ảnh đồ vật" style="max-width: 100%; max-height: 300px; border-radius: 8px; object-fit: cover; display: none;">
+            </div>
+
+            <div class="detail-info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #fff; margin-bottom: 15px;">
+                <p style="margin: 0; font-size: 14.5px; color: #444;"><i class="fa-solid fa-tag" style="color: #7f8c8d; width: 20px; text-align: center; margin-right: 5px;"></i> <strong>Danh mục:</strong> <span id="detailCategory"></span></p>
+                <p style="margin: 0; font-size: 14.5px; color: #444;"><i class="fa-solid fa-location-dot" style="color: #7f8c8d; width: 20px; text-align: center; margin-right: 5px;"></i> <strong>Khu vực:</strong> <span id="detailLocation"></span></p>
+                <p style="margin: 0; font-size: 14.5px; color: #444;"><i class="fa-regular fa-calendar" style="color: #7f8c8d; width: 20px; text-align: center; margin-right: 5px;"></i> <strong>Thời gian:</strong> <span id="detailDate"></span></p>
+                <p style="margin: 0; font-size: 14.5px; color: #444;"><i class="fa-solid fa-user" style="color: #7f8c8d; width: 20px; text-align: center; margin-right: 5px;"></i> <strong>Người đăng:</strong> <span id="detailUser" style="color: #3498db; font-weight: bold;"></span></p>
+            </div>
+
+            <div id="detailMapContainer" style="margin-top: 15px; display: none;">
+                <h4 style="margin: 0 0 8px 0; color: #555; font-size: 14px;">
+                    <i class="fa-solid fa-map-location-dot" style="color: #3498db;"></i> Vị trí trên bản đồ:
+                </h4>
+                <div id="detailMap" style="height: 200px; width: 100%; border-radius: 8px; border: 1px solid #ddd; z-index: 1;"></div>
+            </div>
+
+            <div style="margin-top: 15px; background: #f9f9f9; padding: 15px; border-radius: 8px; border-left: 4px solid #3498db;">
+                <h4 style="margin-top: 0; color: #555; font-size: 14px;">Mô tả chi tiết:</h4>
+                <p id="detailDescription" style="color: #333; line-height: 1.6; font-size: 15px; margin-bottom: 0;">Không có mô tả.</p>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/vi_VN/sdk.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,1217 @@
+:root {
+    --primary: #4A90E2;    /* Màu xanh chủ đạo */
+    --lost: #FF6B6B;       /* Màu đỏ cho Mất đồ */
+    --found: #1DD1A1;      /* Màu xanh cho Nhặt được */
+    background:url("Images/tYi-xuYng.jpg");
+    --text: #333;
+}
+.btn-admin{
+    background:#4f46e5;
+    color:white;
+    border:none;
+    padding:6px 12px;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+.btn-admin:hover{
+    background:#4338ca;
+}
+body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--text);
+}
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 5%;
+    background: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.logo { font-size: 24px; font-weight: bold; color: var(--primary); }
+
+.btn-report {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 20px;
+    color: white;
+    cursor: pointer;
+    font-weight: 600;
+    margin-left: 10px;
+    transition: transform 0.2s;
+}
+.btn-report:hover { transform: scale(1.05); }
+.lost { background-color: var(--lost); }
+.found { background-color: var(--found); }
+
+.hero {
+    text-align: center;
+    padding: 100px 20px;
+    position: relative;
+    font-weight: bold;
+    z-index: 1;
+    min-height: 500px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Background animated slides */
+.hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)), 
+                url('https://images.unsplash.com/photo-1566250749723-b0abea62fe99?crop=entropy&cs=srgb&fm=jpg&ixlib=rb-4.1.0&q=85&w=1920');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    animation: slideBackground1 8s ease-in-out infinite;
+    z-index: -1;
+}
+
+/* Hero content positioning */
+.hero h1, .hero p, .search-box {
+    position: relative;
+    z-index: 2;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.hero h1 {
+    font-size: 48px;
+    margin: 0 0 20px 0;
+    animation: fadeInDown 1s ease-out;
+}
+
+.hero p {
+    font-size: 18px;
+    margin: 0 0 30px 0;
+    animation: fadeInUp 1s ease-out 0.2s backwards;
+}
+
+.search-box {
+    animation: fadeInUp 1s ease-out 0.4s backwards;
+}
+.search-box {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    padding: 5px 15px;
+    border-radius: 30px;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto 15px auto; /* Margin dưới 15px để cách hàng lọc phụ */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.search-box i {
+    color: #7f8c8d;
+    font-size: 18px;
+    margin-right: 10px;
+}
+
+.search-box input {
+    flex: 1;
+    border: none;
+    outline: none;
+    padding: 12px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.search-box select {
+    border: none;
+    outline: none;
+    background: transparent;
+    border-left: 1px solid #ddd;
+    padding-left: 15px;
+    color: #2c3e50;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+/* --- HÀNG 2: BỘ LỌC NÂNG CAO --- */
+.advanced-filters {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* Thiết kế "viên thuốc" cho Vị trí và Ngày tháng */
+.filter-pill {
+    background: white;
+    border-radius: 30px;
+    padding: 8px 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.filter-pill i {
+    color: #3498db;
+}
+
+.filter-pill input {
+    border: none;
+    outline: none;
+    font-size: 14px;
+    color: #333;
+    background: transparent;
+    width: 140px; 
+}
+
+/* Chỉnh riêng độ rộng cho ô chọn ngày */
+.filter-pill.date-range input {
+    width: 110px;
+}
+.filter-pill.date-range span {
+    color: #999;
+}
+
+/* Nút Xóa lọc */
+.btn-clear-filter {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255,255,255,0.6);
+    color: white; 
+    border-radius: 30px;
+    padding: 8px 20px;
+    cursor: pointer;
+    backdrop-filter: blur(5px); /* Hiệu ứng kính mờ */
+    transition: all 0.3s ease;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-clear-filter:hover {
+    background: white;
+    color: #e74c3c; /* Đổi màu chữ đỏ khi đưa chuột vào */
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.search-box {
+    background: white;
+    display: inline-flex;
+    padding: 10px;
+    border-radius: 50px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    margin-top: 20px;
+    width: 60%;
+    align-items: center;
+}
+
+.search-box input {
+    border: none;
+    outline: none;
+    padding: 10px;
+    flex: 1;
+    font-size: 16px;
+}
+
+.search-box select {
+    border: none;
+    border-left: 1px solid #ddd;
+    padding: 10px;
+    outline: none;
+    cursor: pointer;
+}
+
+/* Items Grid */
+.container { padding: 40px 5%; }
+
+.tabs { margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; }
+.tab-btn {
+    padding: 10px 25px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 20px;
+    cursor: pointer;
+}
+.tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+.items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Tự động chia cột */
+    gap: 30px;
+}
+
+/* Card Style */
+.card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    transition: transform 0.3s;
+    position: relative;
+}
+.card:hover { transform: translateY(-5px); }
+
+.card-img { height: 180px; background: #eee; display: flex; align-items: center; justify-content: center; color: #aaa; overflow: hidden;}
+.card-img img { width: 100%; height: 100%; object-fit: cover; }
+
+.card-body { padding: 20px; }
+.card-tag {
+    position: absolute;
+    top: 15px; right: 15px;
+    padding: 5px 12px;
+    border-radius: 12px;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+.tag-lost { background: var(--lost); }
+.tag-found { background: var(--found); }
+
+.card-title { margin: 0 0 10px; font-size: 18px; }
+.card-info { font-size: 14px; color: #666; margin-bottom: 5px; }
+.card-info i { width: 20px; color: var(--primary); }
+
+/* Modal Style */
+.modal {
+    display: none; 
+    position: fixed; 
+    z-index: 1000; 
+    left: 0; top: 0; 
+    width: 100%; height: 100%; 
+    background-color: rgba(0,0,0,0.5); 
+    align-items: center; 
+    justify-content: center;
+}
+.modal-content {
+    /* Thanh Cuộn */
+    max-height: 80vh; 
+    overflow-y: auto;
+
+    background-color: white;
+    padding: 30px;
+    border-radius: 15px;
+    width: 400px;
+    max-width: 90%;
+    position: relative;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown { from {top: -50px; opacity: 0;} to {top: 0; opacity: 1;} }
+
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+.form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+
+.btn-submit { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; }
+
+.close { position: absolute; top: 15px; right: 20px; font-size: 24px; cursor: pointer; }
+
+/* Upload Button Fake */
+.upload-btn-wrapper { position: relative; overflow: hidden; display: inline-block; width: 100%; }
+.btn-upload { border: 2px dashed #ddd; color: #666; background-color: white; padding: 10px; border-radius: 8px; font-size: 14px; width: 100%; cursor: pointer; }
+.upload-btn-wrapper input[type=file] { font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; }
+
+/* Merge Modal Highlight */
+.highlight-modal { text-align: center; border-top: 5px solid var(--found); }
+.match-item { display: flex; align-items: center; background: #f9f9f9; padding: 10px; border-radius: 10px; margin: 15px 0; text-align: left; }
+.match-item img { width: 50px; height: 50px; border-radius: 5px; margin-right: 15px; }
+.btn-contact { background: var(--found); color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; }
+.btn-cancel { background: transparent; border: none; color: #888; cursor: pointer; margin-left: 10px; }
+/* ... GIỮ NGUYÊN CSS CŨ TỪ BÀI TRƯỚC ... */
+/* ... CHỈ THÊM CÁC ĐOẠN DƯỚI ĐÂY VÀO CUỐI FILE ... */
+
+/* Nút Login trên Menu */
+.btn-login {
+    background: transparent;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.3s;
+}
+.form-group {
+    border-bottom: 1px solid #fff;
+    margin-top: 15px;
+    margin-bottom: 20px;
+    display :flex;
+    align-items: center;
+    
+    padding-bottom: 5px; /* Tạo khoảng hở giữa chữ và đường kẻ */
+    transition: 0.3s;
+}
+.btn-login:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.user-avatar {
+    width: 35px; height: 35px;
+    background: #ddd;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: #555;
+}
+.btn-logout {
+    color: #FF6B6B;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: underline;
+    background: none; border: none;
+}
+
+.auth-content {
+    max-width: 350px;
+    text-align: center;
+}
+.auth-links {
+    margin-top: 15px;
+    font-size: 13px;
+}
+.auth-links a {
+    color: var(--primary);
+    text-decoration: none;
+}
+.auth-links a:hover {
+    text-decoration: underline;
+}
+.action-buttons {
+    display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;
+}
+
+/* ========== ANIMATION CHO FORM ĐĂNG KÝ ========== */
+
+/* Animation xuất hiện modal */
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Animation cho input field */
+@keyframes inputFocus {
+    from {
+        border-color: #ddd;
+        box-shadow: 0 0 0 0 rgba(74, 144, 226, 0);
+    }
+    to {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+    }
+}
+
+/* Animation cho form nổi lên */
+@keyframes formSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Animation form chuyển đổi */
+@keyframes formSwitchOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-50px);
+    }
+}
+
+@keyframes formSwitchIn {
+    from {
+        opacity: 0;
+        transform: translateX(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Animation nút submit */
+@keyframes buttonHover {
+    0% {
+        transform: translateY(0);
+        box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+    100% {
+        transform: translateY(0);
+        box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
+    }
+}
+
+/* Animation check icon */
+@keyframes checkMark {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Animation input label */
+@keyframes labelMove {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+}
+.modal-content {
+    /* Dải màu Gradient xanh nhạt bắt mắt */
+    background: linear-gradient(135deg, #e3f2fd 0%, #e0f7fa 100%) !important;
+    
+    /* Thêm viền xanh mờ cho xịn sò */
+    border: 1px solid #bbdefb;
+    
+    /* Bo góc và đổ bóng nhẹ (nếu form của bạn chưa có) */
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+#authModal .modal-content {
+    animation: modalFadeIn 0.4s ease-out;
+}
+
+/* Áp dụng animation cho form */
+#loginForm, #registerForm, #forgotForm {
+    animation: formSlideUp 0.5s ease-out;
+}
+
+/* Hiệu ứng khi chuyển form */
+#loginForm.fade-out {
+    animation: formSwitchOut 0.3s ease-out forwards;
+}
+
+#loginForm.fade-in {
+    animation: formSwitchIn 0.3s ease-out forwards;
+}
+
+#registerForm.fade-out {
+    animation: formSwitchOut 0.3s ease-out forwards;
+}
+
+#registerForm.fade-in {
+    animation: formSwitchIn 0.3s ease-out forwards;
+}
+
+#forgotForm.fade-out {
+    animation: formSwitchOut 0.3s ease-out forwards;
+}
+
+#forgotForm.fade-in {
+    animation: formSwitchIn 0.3s ease-out forwards;
+}
+
+/* Input field với animation focus */
+.auth-content .form-group input {
+    transition: all 0.3s ease;
+    border: 2px solid #ddd;
+    padding: 12px 15px;
+    font-size: 14px;
+    border-radius: 8px;
+}
+
+/* Input wrapper style - icon + input trong cùng hộp */
+.auth-content .input-wrapper {
+    position: relative;
+    display: flex !important;
+    align-items: center;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 0;
+    margin: 0;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.auth-content .input-wrapper input {
+    flex: 1;
+    border: none !important;
+    padding: 12px 15px !important;
+    outline: none;
+    background: transparent;
+    font-size: 14px;
+    color: #333;
+}
+
+.auth-content .input-wrapper input::placeholder {
+    color: #aaa;
+}
+
+.auth-content .input-wrapper input:focus::placeholder {
+    color: #ddd;
+}
+
+.auth-content .input-icon {
+    padding: 0 15px;
+    color: #bbb;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.auth-content .input-wrapper:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.auth-content .input-wrapper:focus-within .input-icon {
+    color: var(--primary);
+}
+
+.auth-content .form-group:not(.input-wrapper) input {
+    transition: all 0.3s ease;
+    border: 2px solid #ddd;
+    padding: 12px 15px;
+    font-size: 14px;
+    border-radius: 8px;
+}
+
+.auth-content .form-group input:focus {
+    animation: inputFocus 0.3s ease forwards;
+    outline: none;
+}
+
+.auth-content .form-group input::placeholder {
+    color: #aaa;
+    transition: color 0.3s ease;
+}
+
+.auth-content .form-group input:focus::placeholder {
+    color: #ddd;
+}
+
+/* Button submit animation */
+.auth-content .btn-submit {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 14px;
+}
+
+.auth-content .btn-submit:hover {
+    animation: buttonHover 0.6s ease;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(74, 144, 226, 0.4);
+}
+
+.auth-content .btn-submit:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+}
+
+/* Nút submit loading state */
+.btn-submit.loading {
+    color: transparent;
+}
+
+.btn-submit.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Form group animation */
+.auth-content .form-group {
+    margin-bottom: 20px;
+    position: relative;
+    display: flex;
+    border: none;
+    padding: 0;
+}
+
+.auth-content .form-group:not(.input-wrapper) {
+    display: block;
+}
+
+/* Success message animation */
+.success-message {
+    animation: slideInDown 0.4s ease;
+    color: #1DD1A1;
+    font-size: 14px;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.success-message::before {
+    content: '✓';
+    font-weight: bold;
+    animation: checkMark 0.5s ease;
+}
+
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Error message animation */
+.error-message {
+    animation: shake 0.5s ease;
+    color: #FF6B6B;
+    font-size: 13px;
+    margin-top: 5px;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+/* Password strength indicator */
+.password-strength {
+    margin-top: 10px;
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.password-strength-bar {
+    height: 100%;
+    width: 0;
+    background: #FF6B6B;
+    transition: all 0.4s ease;
+}
+
+.password-strength-bar.medium {
+    width: 66%;
+    background: #FFB84D;
+}
+
+.password-strength-bar.strong {
+    width: 100%;
+    background: #1DD1A1;
+}
+
+/* Link animation */
+.auth-links a {
+    transition: all 0.3s ease;
+    position: relative;
+    display: inline-block;
+}
+
+.auth-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--primary);
+    transition: width 0.3s ease;
+}
+
+.auth-links a:hover::after {
+    width: 100%;
+}
+#typing-text::after {
+    content: "|";
+    margin-left: 5px;
+    animation: blink 1s infinite;
+}
+.login-container {
+    width: 350px;
+    margin: 50px auto;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    font-family: Arial, sans-serif;
+}
+
+/* Chữ "Hoặc đăng nhập bằng" */
+.social-text {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+/* Khu vực chứa 2 nút */
+.social-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px; /* Khoảng cách giữa 2 nút */
+}
+
+/* Trang trí nút Facebook cho tròn và đẹp */
+#fb-btn {
+    width: 40px;
+    height: 40px;
+    background-color: #1877F2; /* Màu xanh chuẩn Facebook */
+    color: white;
+    border: none;
+    border-radius: 50%; /* Làm tròn */
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s;
+}
+
+#fb-btn:hover {
+    background-color: #165dbb; /* Màu khi di chuột vào */
+}
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0; }
+    100% { opacity: 1; }
+}
+/* Thanh Cuộn */
+.modal-content::-webkit-scrollbar {
+    width: 6px; 
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+    background-color: #bbb; 
+    border-radius: 10px;    
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+    background-color: #888; 
+}
+
+/* Container chứa toàn bộ */
+.user-dropdown-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* Vùng nhấn (Avatar + Mũi tên) */
+.user-trigger {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 20px;
+}
+
+.user-trigger:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+/* Vòng tròn chứa icon user */
+.user-avatar-circle {
+    width: 35px;
+    height: 35px;
+    background-color: #e4e6eb; /* Màu xám nhạt giống FB */
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #050505;
+}
+
+/* Mũi tên xuống */
+.caret-icon {
+    font-size: 12px;
+    color: #65676b;
+}
+
+/* Menu thả xuống */
+.dropdown-menu-box {
+    display: none;
+    position: absolute;
+    top: 110%;
+    right: 0;
+    background: white;
+    min-width: 180px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-radius: 8px;
+    z-index: 9999;
+    padding: 8px;
+    border: 1px solid #ddd;
+}
+
+.dropdown-menu-box.active {
+    display: block;
+}
+
+.menu-header {
+    padding: 8px;
+    font-size: 14px;
+}
+
+.menu-item {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.menu-item:hover {
+    background-color: #f2f2f2;
+}
+
+.logout-red {
+    color: #d32f2f;
+}
+/* =========================================
+   STYLE CHO SECTION TIN TỨC (GIAO DIỆN MỚI)
+   ========================================= */
+
+/* Main Container cho News */
+#news-container {
+    margin-top: 60px;
+    padding-top: 40px;
+    border-top: 2px dashed #e1e8ed; /* Đường gạch nối nhẹ nhàng hơn */
+}
+
+/* Header của Section */
+.news-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.news-header h2 {
+    color: #2c3e50;
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.news-header h2 i {
+    color: #3498db; /* Màu xanh iconic cho icon tin tức */
+}
+
+.news-header p {
+    color: #7f8c8d;
+    font-size: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Bố cục Lưới Tin tức (Responsive Grid) */
+.news-grid {
+    display: grid;
+    /* Tự động chia cột: tối thiểu 300px, tối đa 1 phần */
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 30px; /* Khoảng cách giữa các thẻ */
+}
+
+/* Style cho từng Thẻ Tin tức (Card) */
+.news-card {
+    background: white;
+    border-radius: 16px; /* Bo góc soft hơn */
+    overflow: hidden; /* Để ảnh không chồm ra ngoài */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); /* Bóng đổ nhẹ */
+    border: 1px solid #f0f3f5; /* Viền siêu mỏng */
+    transition: all 0.3s ease; /* Animation mượt mà cho hover */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Hiệu ứng Hover nổi lên */
+.news-card:hover {
+    transform: translateY(-8px); /* Nổi lên */
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12); /* Bóng đổ đậm hơn */
+}
+
+/* Style cho hình ảnh tin tức */
+.news-card-img {
+    width: 100%;
+    height: 200px; /* Bắt buộc phải có chiều cao cố định */
+    background-color: #f0f0f0; /* Hiện màu xám trong lúc chờ load ảnh */
+    overflow: hidden;
+}
+
+.news-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Giúp ảnh không bị bóp méo */
+    display: block;
+}
+
+/* Zoom nhẹ ảnh khi hover vào card */
+.news-card:hover .news-card-img img {
+    transform: scale(1.08);
+}
+
+/* Nguồn tin và Thời gian (Overlay trên ảnh) */
+.news-meta-badge {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.7); /* Nền đen mờ */
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(4px); /* Hiệu ứng kính mờ */
+}
+
+/* Phần nội dung chữ bên dưới ảnh */
+.news-card-body {
+    padding: 25px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Tiêu đề tin */
+.news-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 12px;
+    line-height: 1.5;
+    text-decoration: none; /* Bỏ gạch chân */
+    transition: color 0.2s;
+    
+    /* Hiển thị tối đa 2 dòng, còn lại hiện ... */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.news-card-title:hover {
+    color: #3498db; /* Đổi màu khi hover vào tiêu đề */
+}
+
+/* Mô tả ngắn */
+.news-card-description {
+    font-size: 14px;
+    color: #7f8c8d;
+    line-height: 1.7;
+    margin-bottom: 20px;
+    flex-grow: 1; /* Đẩy nút xuống đáy card */
+
+    /* Hiển thị tối đa 3 dòng, còn lại hiện ... */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Nút "Đọc thêm" */
+.btn-read-more {
+    color: #3498db;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: gap 0.2s;
+}
+
+.btn-read-more:hover {
+    gap: 8px; /* Di chuyển mũi tên sang phải một chút */
+}
+
+/* Style cho trạng thái đang tải */
+.news-loading {
+    text-align: center;
+    grid-column: 1 / -1; /* Trải dài hết các cột */
+    padding: 50px 0;
+    color: #95a5a6;
+}
+
+.news-loading i {
+    font-size: 40px;
+    margin-bottom: 15px;
+    color: #3498db;
+}
+
+/* =========================================
+   STYLE CHO BỐ CỤC FACEBOOK (THÊM MỚI)
+   ========================================= */
+
+/* Màu nền xám đặc trưng của Facebook */
+body { background-color: #f0f2f5; }
+
+/* Bố cục 3 cột */
+.fb-layout {
+    display: flex;
+    justify-content: space-between;
+    max-width: 1300px;
+    margin: 80px auto 20px; /* Cách thanh Nav ở trên */
+    padding: 0 15px;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+/* Hai cột trái/phải cố định khi cuộn */
+.fb-sidebar-left, .fb-sidebar-right {
+    width: 280px;
+    position: sticky;
+    top: 80px; 
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+}
+
+/* Thiết kế Menu Trái */
+.fb-menu-item {
+    padding: 12px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #050505;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: background 0.2s;
+}
+.fb-menu-item:hover { background-color: #e4e6eb; }
+.fb-menu-item i { font-size: 20px; width: 25px; text-align: center; color: #1877f2; }
+
+/* Cột giữa (Feed bài viết cuộn dọc) */
+.fb-feed {
+    flex: 1;
+    max-width: 650px;
+}
+
+/* Box "Bạn đang nghĩ gì?" và Box Cột phải */
+.fb-box {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+/* ÉP CÁC BÀI VIẾT THÀNH 1 CỘT DỌC (Scroll xuống như Facebook) */
+.fb-style-grid {
+    display: flex !important;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Chỉnh lại hình dáng thẻ bài viết */
+.fb-style-grid .card {
+    width: 100% !important; /* Trải dài hết cỡ */
+    margin: 0 !important;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    display: block; /* Hủy flex ngang cũ */
+}
+.fb-style-grid .card-img {
+    width: 100%;
+    height: auto;
+    max-height: 500px;
+    border-radius: 12px 12px 0 0;
+}
+.fb-style-grid .card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Ô input bên cột phải */
+.fb-input {
+    width: 100%; padding: 10px; margin-bottom: 10px;
+    border-radius: 8px; border: 1px solid #ccd0d5;
+    box-sizing: border-box; background: #f0f2f5; outline: none;
+}
+.fb-input:focus { border-color: #1877f2; }

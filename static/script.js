@@ -459,11 +459,11 @@ function showAiMatchModal(matches, postType) {
 }
 
 // ── Load bài đăng từ DB thay vì mockData ─────────────────────────
-async function loadPosts(type = '', category = '', location = '') {
+async function loadPosts(type = '', category = '', location = '', status = 'active') {
     const grid = document.getElementById('itemsGrid');
     grid.innerHTML = '<p style="text-align:center;color:#999;">Đang tải...</p>';
 
-    const url = `/api/posts?type=${type}&category=${category}&location=${location}`;
+    const url = `/api/posts?type=${type}&category=${category}&location=${location}&status=${status}`;
 
     try {
         const res   = await fetch(url);
@@ -500,21 +500,32 @@ function renderItems(data) {
         const isOwner    = currentUser && currentUser.id === item.user_id;
 
         // Thêm event.stopPropagation() để không bị dội sự kiện bấm vào Card
-        const ownerButtons = isOwner ? `
-            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-                <button onclick="event.stopPropagation(); resolvePost(${item.id})"
-                    style="padding:6px 12px;background:#1DD1A1;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
-                    ✅ Đã giải quyết
+        const isResolved   = item.status === 'resolved';
+        const ownerButtons = isOwner ? (isResolved ? `
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+                <button onclick="event.stopPropagation();unresolvePost(${item.id})"
+                    style="padding:6px 12px;background:#f39c12;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    🔄 Chưa giải quyết
                 </button>
-                <button onclick="event.stopPropagation(); openEditModal(${item.id})"
-                    style="padding:6px 12px;background:#4A90E2;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
-                    ✏️ Sửa
-                </button>
-                <button onclick="event.stopPropagation(); deletePost(${item.id})"
+                <button onclick="event.stopPropagation();deletePost(${item.id})"
                     style="padding:6px 12px;background:#FF6B6B;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
                     🗑️ Xóa
                 </button>
-            </div>` : '';
+            </div>` : `
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+                <button onclick="event.stopPropagation();resolvePost(${item.id})"
+                    style="padding:6px 12px;background:#1DD1A1;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    ✅ Đã giải quyết
+                </button>
+                <button onclick="event.stopPropagation();openEditModal(${item.id})"
+                    style="padding:6px 12px;background:#4A90E2;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    ✏️ Sửa
+                </button>
+                <button onclick="event.stopPropagation();deletePost(${item.id})"
+                    style="padding:6px 12px;background:#FF6B6B;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    🗑️ Xóa
+                </button>
+            </div>`) : '';
 
         // Đã thêm sự kiện onclick="showPostDetail" vào từng thẻ bài viết
         grid.innerHTML += `
@@ -543,6 +554,9 @@ let detailMarker;
 
 // --- HÀM HIỂN THỊ CHI TIẾT BÀI ĐĂNG (CÓ TÍCH HỢP BẢN ĐỒ) ---
 function showPostDetail(postId) {
+    // Set currentDetailPostId để các hàm comment/contact/share dùng
+    currentDetailPostId = postId;
+
     // 1. Tìm bài viết có ID tương ứng
     const post = allPostsData.find(p => p.id === postId);
     if (!post) return;
@@ -664,11 +678,20 @@ async function deletePost(postId) {
 }
 
 // ── Lọc theo tab ─────────────────────────────────────────────────
+let currentTabType   = '';
+let currentTabStatus = 'active';
+
 function filterType(type) {
-    const t = type === 'all' ? '' : type;
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
-    loadPosts(t);
+    if (type === 'resolved') {
+        currentTabType   = '';
+        currentTabStatus = 'resolved';
+    } else {
+        currentTabType   = type === 'all' ? '' : type;
+        currentTabStatus = 'active';
+    }
+    loadPosts(currentTabType, '', '', currentTabStatus);
 }
 
 // ── Tìm kiếm ─────────────────────────────────────────────────────
@@ -699,7 +722,13 @@ function filterItems() {
 async function resolvePost(postId) {
     if (!confirm("Đánh dấu bài này là ĐÃ GIẢI QUYẾT?")) return;
     await fetch(`/api/posts/${postId}/resolve`, { method: 'PUT' });
-    loadPosts();
+    loadPosts(currentTabType, '', '', currentTabStatus);
+}
+
+async function unresolvePost(postId) {
+    if (!confirm("Đặt lại bài này thành CHƯA GIẢI QUYẾT?")) return;
+    await fetch(`/api/posts/${postId}/unresolve?user_id=${currentUser.id}`, { method: 'PUT' });
+    loadPosts(currentTabType, '', '', currentTabStatus);
 }
 
 // ── Helper: format thời gian ──────────────────────────────────────
@@ -1141,6 +1170,203 @@ function fakeAIScan() {
     document.getElementById('itemName').value = "Ví da nam";
 }
 
+
+// ══ DETAIL MODAL FUNCTIONS ══════════════════════════════════════
+let currentDetailPostId = null;
+
+function openDetailModal(postId) {
+    currentDetailPostId = postId;
+    showPostDetail(postId);
+}
+
+async function contactAuthor() {
+    const box = document.getElementById('detailContactBox');
+    if (box && box.style.display !== 'none') { box.style.display = 'none'; return; }
+    if (!currentUser) { alert('Bạn cần đăng nhập để xem thông tin liên hệ!'); return; }
+    const post = allPostsData.find(p => p.id === currentDetailPostId);
+    if (!post) return;
+    try {
+        const res  = await fetch(`/api/users/contact/${post.user_id}`);
+        const data = await res.json();
+        const phoneEl = document.getElementById('contactPhone');
+        const emailEl = document.getElementById('contactEmail');
+        if (phoneEl) phoneEl.querySelector('span').textContent = data.phone || 'Chưa cập nhật';
+        if (emailEl) emailEl.querySelector('span').textContent = data.email || 'Chưa cập nhật';
+        if (box) box.style.display = 'block';
+    } catch(e) { alert('Không lấy được thông tin liên hệ!'); }
+}
+
+function sharePost() {
+    const post = allPostsData.find(p => p.id === currentDetailPostId);
+    if (!post) return;
+    const text = `[Lost&Found] ${post.type === 'lost' ? 'Mất đồ' : 'Nhặt được'}: ${post.item_name} tại ${post.location}`;
+    if (navigator.share) {
+        navigator.share({ title: text, text: text, url: window.location.href });
+    } else {
+        navigator.clipboard.writeText(`${text}\n${window.location.href}`)
+            .then(() => alert('✅ Đã copy link vào clipboard!'))
+            .catch(() => alert('Link: ' + window.location.href));
+    }
+}
+
+function toggleComments() {
+    const section = document.getElementById('commentSection');
+    if (!section) return;
+    section.style.display = section.style.display === 'none' ? 'block' : 'none';
+    if (section.style.display === 'block') {
+        loadComments(currentDetailPostId);
+    }
+}
+
+async function loadComments(postId) {
+    try {
+        const res      = await fetch(`/api/posts/${postId}/comments`);
+        const comments = await res.json();
+        const label    = document.getElementById('commentCountLabel');
+        if (label) label.textContent = `Bình luận (${comments.length})`;
+        renderComments(comments);
+    } catch(e) {
+        const list = document.getElementById('commentList');
+        if (list) list.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;">Chưa có bình luận nào.</p>';
+    }
+}
+
+function buildCommentHTML(c, isReply = false) {
+    const avatarSize = isReply ? '24px' : '30px';
+    const fontSize   = isReply ? '12px' : '13px';
+    const marginLeft = isReply ? 'margin-left:39px;' : '';
+
+    const repliesHTML = (c.replies && c.replies.length > 0)
+        ? c.replies.map(r => buildCommentHTML(r, true)).join('')
+        : '';
+
+    return `
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;${marginLeft}">
+            <div style="width:${avatarSize};height:${avatarSize};border-radius:50%;background:linear-gradient(135deg,#4A90E2,#6366f1);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;flex-shrink:0;">
+                <i class="fa-solid fa-user"></i>
+            </div>
+            <div style="flex:1;">
+                <div style="background:#f1f5f9;border-radius:12px;padding:8px 12px;display:inline-block;max-width:100%;">
+                    <span style="font-size:12px;font-weight:700;color:#1a1a2e;display:block;margin-bottom:2px;">${c.username}</span>
+                    <p style="font-size:${fontSize};color:#444;margin:0;">${c.content}</p>
+                </div>
+                <div style="display:flex;gap:12px;margin-top:3px;padding-left:4px;">
+                    <span style="font-size:10.5px;color:#94a3b8;">${formatTime(c.created_at)}</span>
+                    ${currentUser ? `<button onclick="showReplyInput(${c.id}, '${c.username}')"
+                        style="font-size:11px;font-weight:700;color:#64748b;background:none;border:none;cursor:pointer;padding:0;">
+                        Trả lời
+                    </button>` : ''}
+                </div>
+                <div id="replyInput_${c.id}" style="display:none;margin-top:6px;margin-left:4px;">
+                    <div style="display:flex;gap:7px;align-items:center;">
+                        <div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#4A90E2,#6366f1);display:flex;align-items:center;justify-content:center;color:white;font-size:10px;flex-shrink:0;">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div style="flex:1;display:flex;align-items:center;background:#f1f5f9;border-radius:20px;padding:5px 8px 5px 12px;gap:6px;">
+                            <input type="text" id="replyInputText_${c.id}"
+                                placeholder="Trả lời ${c.username}..."
+                                style="flex:1;border:none;background:transparent;outline:none;font-size:12px;color:#333;"
+                                onkeydown="if(event.key==='Enter') submitReply(${c.id})">
+                            <button onclick="submitReply(${c.id})"
+                                style="background:#4A90E2;color:white;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ${repliesHTML}
+            </div>
+        </div>`;
+}
+
+function showReplyInput(commentId, username) {
+    // Ẩn tất cả reply input khác
+    document.querySelectorAll('[id^="replyInput_"]').forEach(el => {
+        el.style.display = 'none';
+    });
+    const box = document.getElementById(`replyInput_${commentId}`);
+    if (box) {
+        box.style.display = 'block';
+        const input = document.getElementById(`replyInputText_${commentId}`);
+        if (input) input.focus();
+    }
+}
+
+async function submitReply(parentCommentId) {
+    if (!currentUser) { alert('Bạn cần đăng nhập để trả lời!'); return; }
+    const input = document.getElementById(`replyInputText_${parentCommentId}`);
+    const text  = (input ? input.value : '').trim();
+    if (!text) return;
+    try {
+        const res = await fetch(`/api/posts/${currentDetailPostId}/comments`, {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body   : JSON.stringify({
+                user_id  : currentUser.id,
+                username : currentUser.username,
+                content  : text,
+                parent_id: parentCommentId
+            })
+        });
+        if (res.ok) {
+            if (input) input.value = '';
+            loadComments(currentDetailPostId);
+        }
+    } catch(e) { alert('Lỗi gửi trả lời!'); }
+}
+
+function renderComments(comments) {
+    const list = document.getElementById('commentList');
+    if (!list) return;
+    if (!comments || comments.length === 0) {
+        list.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;padding:12px 0;">Chưa có bình luận nào. Hãy là người đầu tiên!</p>';
+        return;
+    }
+    list.innerHTML = comments.map(c => buildCommentHTML(c)).join('');
+}
+
+async function submitComment() {
+    if (!currentUser) { alert('Bạn cần đăng nhập để bình luận!'); return; }
+    const input = document.getElementById('commentInput');
+    const text  = (input ? input.value : '').trim();
+    if (!text) return;
+    try {
+        const res = await fetch(`/api/posts/${currentDetailPostId}/comments`, {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body   : JSON.stringify({ user_id: currentUser.id, username: currentUser.username, content: text })
+        });
+        if (res.ok) { if (input) input.value = ''; loadComments(currentDetailPostId); }
+        else { const d = await res.json(); alert(d.message || 'Lỗi gửi bình luận!'); }
+    } catch(e) { alert('Lỗi gửi bình luận!'); }
+}
+
+async function fetchAiSuggestions(myPost, postType) {
+    const oppositeType = postType === 'lost' ? 'found' : 'lost';
+    const params = new URLSearchParams({
+        opposite_type: oppositeType,
+        category     : myPost.category  || '',
+        location     : myPost.location  || '',
+        date         : myPost.lost_date || '',
+        item_name    : myPost.item_name || ''
+    });
+    try {
+        const res  = await fetch(`/api/suggest?${params}`);
+        const list = await res.json();
+        if (!list || list.length === 0) {
+            alert('✅ Đăng tin thành công! Chưa tìm thấy đồ tương đồng.');
+            return;
+        }
+        const matches = list.map(item => ({
+            item_name   : item.item_name,
+            score       : Math.min(100, (item.score || 1) * 20),
+            distance_km : '—',
+            contact_user: item.username || 'Ẩn danh'
+        }));
+        showAiMatchModal(matches, postType);
+    } catch(err) { alert('✅ Đăng tin thành công!'); }
+}
+
 // Utility
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
@@ -1190,11 +1416,15 @@ function typeEffect() {
   setTimeout(typeEffect, isDeleting ? deletingSpeed : typingSpeed);
 }
 
-typeEffect();
+// Chỉ chạy typeEffect nếu element tồn tại
+if (document.getElementById("typing-text")) {
+    typeEffect();
+}
 
 // --- KHỞI CHẠY ---
-initAuth();   // Check đăng nhập
-loadPosts();  // ← Thay renderItems(mockData) bằng loadPosts() để tải từ DB
+initAuth();
+updateUserArea();
+loadPosts();
 
 // Lấy user từ localStorage
 const user = JSON.parse(localStorage.getItem("currentUser"));
@@ -1276,9 +1506,7 @@ handleLogout = function() {
     }
 };
 
-window.addEventListener('load', function() {
-    updateUserArea();
-});
+// updateUserArea() đã được gọi khi khởi chạy
 // Hàm chuyển sang trang admin
 function goAdmin(){
     window.location.href = "/admin";

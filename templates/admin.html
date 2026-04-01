@@ -2,42 +2,46 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard</title>
+    <title>Admin Dashboard - Lost&Found</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Poppins; }
-        body { display: flex; background: #f4f6fb; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+        body { display: flex; background: #f4f6fb; min-height: 100vh; }
 
         /* SIDEBAR */
         .sidebar { width: 230px; height: 100vh; background: linear-gradient(180deg,#4f46e5,#6366f1); color: white; padding: 30px 20px; position: fixed; }
-        .sidebar h2 { margin-bottom: 40px; }
+        .sidebar h2 { margin-bottom: 40px; font-weight: 600; text-align: center; }
         .sidebar ul { list-style: none; }
-        .sidebar ul li { margin: 20px 0; cursor: pointer; transition: 0.3s; padding: 10px; border-radius: 8px; }
-        .sidebar ul li:hover, .sidebar ul li.active { background: rgba(255,255,255,0.1); transform: translateX(5px); }
-        .sidebar ul li i { margin-right: 10px; }
+        .sidebar ul li { margin: 15px 0; cursor: pointer; transition: 0.3s; padding: 12px; border-radius: 8px; display: flex; align-items: center; }
+        .sidebar ul li:hover { background: rgba(255,255,255,0.1); transform: translateX(5px); }
+        .sidebar ul li i { margin-right: 12px; width: 20px; text-align: center; }
 
-        /* MAIN */
-        .main { margin-left: 230px; width: 100%; }
+        /* MAIN CONTENT */
+        .main { margin-left: 230px; width: calc(100% - 230px); }
         .header { background: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         
         /* DASHBOARD CARDS */
         .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 30px; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
         .card i { font-size: 30px; color: #4f46e5; }
-        .card h3 { font-size: 26px; }
+        .card h3 { font-size: 26px; margin-top: 5px; }
 
-        /* TABLE */
-        .table-section { padding: 30px; display: none; /* Mặc định ẩn các bảng */ }
-        table { width: 100%; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-collapse: collapse; margin-top: 15px; }
-        th { background: #4f46e5; color: white; padding: 12px; }
-        td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
-        tr:hover { background: #f9fafc; }
+        /* TABLE STYLES */
+        .table-section { padding: 30px; display: none; }
+        .table-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: #f8fafc; color: #64748b; padding: 12px; text-align: center; font-weight: 600; border-bottom: 2px solid #edf2f7; }
+        td { padding: 14px; border-bottom: 1px solid #edf2f7; text-align: center; color: #1e293b; }
+        tr:hover { background: #f1f5f9; }
 
-        button { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; }
-        .btn-delete { background: #ef4444; color: white; }
-        .btn-refresh { background: #4f46e5; color: white; margin-bottom: 10px; }
-        .btn-home { background: #eee; color: #333; }
+        /* BUTTONS */
+        button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .btn-delete { background: #fee2e2; color: #ef4444; font-weight: 600; }
+        .btn-delete:hover { background: #ef4444; color: white; }
+        .btn-refresh { background: #4f46e5; color: white; margin-bottom: 15px; }
+        .btn-refresh:hover { background: #4338ca; }
+        .btn-home { background: #f1f5f9; color: #475569; }
     </style>
 </head>
 <body>
@@ -45,147 +49,200 @@
 <div class="sidebar">
     <h2>Lost&Found</h2>
     <ul>
-        <li onclick="showSection('dashboard')"><i class="fa fa-chart-line"></i> Dashboard</li>
-        <li onclick="showSection('users')"><i class="fa fa-users"></i> Users</li>
-        <li onclick="showSection('items')"><i class="fa fa-box"></i> Items</li>
-        <li onclick="logout()"><i class="fa fa-sign-out-alt"></i> Logout</li>
+        <li onclick="showSection('dashboard')"><i class="fa-solid fa-chart-line"></i> Dashboard</li>
+        <li onclick="showSection('users')"><i class="fa-solid fa-users"></i> Users</li>
+        <li onclick="showSection('items')"><i class="fa-solid fa-box-open"></i> Items</li>
+        <li onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> logout</li>
     </ul>
 </div>
 
 <div class="main">
     <div class="header">
-        <button onclick="window.location.href='/'" class="btn-home">← Về trang chủ</button>
+        <button onclick="window.location.href='/'" class="btn-home"><i class="fa-solid fa-arrow-left"></i> Về trang chủ</button>
         <h3>Admin Dashboard</h3>
-        <div class="admin"><i class="fa fa-user-circle"></i> <span>Admin</span></div>
+        <div class="admin"><i class="fa-solid fa-user-shield"></i> <span>Admin</span></div>
     </div>
 
-    <div id="section-dashboard">
+    <div id="section-dashboard" class="table-section" style="display: block;">
         <div class="cards">
             <div class="card">
                 <div><p>Tổng Users</p><h3 id="totalUsers">0</h3></div>
-                <i class="fa fa-users"></i>
+                <i class="fa-solid fa-users"></i>
             </div>
             <div class="card">
                 <div><p>Đồ thất lạc</p><h3>24</h3></div>
-                <i class="fa fa-search"></i>
+                <i class="fa-solid fa-magnifying-glass"></i>
             </div>
             <div class="card">
-                <div><p>Đồ đã tìm</p><h3>15</h3></div>
-                <i class="fa fa-check-circle"></i>
+                <div><p>Đã tìm thấy</p><h3>15</h3></div>
+                <i class="fa-solid fa-circle-check"></i>
             </div>
         </div>
     </div>
 
     <div id="section-users" class="table-section">
-        <h3>Quản lý người dùng</h3>
-        <button class="btn-refresh" onclick="loadUsers()">Làm mới</button>
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="userTable"></tbody>
-        </table>
+        <div class="table-container">
+            <h3>Users</h3>
+            <button class="btn-refresh" onclick="loadUsers()"><i class="fa-solid fa-rotate"></i> Làm mới</button>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tên đăng nhập</th>
+                        <th>Email</th>
+                        <th>Vai trò</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="userTable"></tbody>
+            </table>
+        </div>
     </div>
 
     <div id="section-items" class="table-section">
-        <h3>Quản lý danh sách tin đăng</h3>
-        <button class="btn-refresh" onclick="loadAdminPosts()">Làm mới</button>
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Người đăng</th>
-                    <th>Tên đồ</th>
-                    <th>Loại</th>
-                    <th>Ngày đăng</th>
-                    <th>Hành động</th>
-                </tr>
-            </thead>
-            <tbody id="postTable"></tbody>
-        </table>
+        <div class="table-container">
+            <h3>Items</h3>
+            <button class="btn-refresh" onclick="loadAdminPosts()"><i class="fa-solid fa-rotate"></i> Làm mới</button>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Người đăng</th>
+                        <th>Tên vật phẩm</th>
+                        <th>Phân loại</th>
+                        <th>Ngày đăng</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="postTable"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <script>
-    // --- HÀM CHUYỂN ĐỔI GIỮA CÁC MỤC ---
+    // --- CHUYỂN ĐỔI MỤC ---
     function showSection(name) {
-        // Ẩn tất cả
-        document.getElementById('section-dashboard').style.display = 'none';
-        document.getElementById('section-users').style.display = 'none';
-        document.getElementById('section-items').style.display = 'none';
+        // Ẩn tất cả các section
+        const sections = document.querySelectorAll('.table-section');
+        sections.forEach(s => s.style.display = 'none');
 
-        // Hiện mục được chọn
-        document.getElementById('section-' + name).style.display = 'block';
+        // Hiện section được chọn
+        const target = document.getElementById('section-' + name);
+        if (target) {
+            target.style.display = 'block';
+        }
 
-        // Tải dữ liệu tương ứng
+        // Tự động tải dữ liệu khi chuyển tab
         if (name === 'users') loadUsers();
         if (name === 'items') loadAdminPosts();
     }
 
-    // --- QUẢN LÝ USERS ---
+    // --- QUẢN LÝ NGƯỜI DÙNG ---
     async function loadUsers() {
-        const res = await fetch("/api/users");
-        const users = await res.json();
-        const table = document.getElementById("userTable");
-        document.getElementById("totalUsers").innerText = users.length;
-        table.innerHTML = "";
-        users.forEach(u => {
-            table.innerHTML += `
-                <tr>
-                    <td>${u.id}</td>
-                    <td>${u.username}</td>
-                    <td>${u.email}</td>
-                    <td>${u.role}</td>
-                    <td><button class="btn-delete" onclick="deleteUser(${u.id})">Xóa</button></td>
-                </tr>`;
-        });
+        try {
+            const res = await fetch("/api/users");
+            const users = await res.json();
+            const table = document.getElementById("userTable");
+            document.getElementById("totalUsers").innerText = users.length;
+            
+            table.innerHTML = "";
+            users.forEach(u => {
+                table.innerHTML += `
+                    <tr>
+                        <td>${u.id}</td>
+                        <td>${u.username}</td>
+                        <td>${u.email}</td>
+                        <td><span class="badge">${u.role || 'User'}</span></td>
+                        <td><button class="btn-delete" onclick="deleteUser(${u.id})">Xóa</button></td>
+                    </tr>`;
+            });
+        } catch (err) {
+            console.error("Lỗi tải users:", err);
+        }
     }
 
     async function deleteUser(id) {
-        if (!confirm("Xóa người dùng này?")) return;
-        await fetch(`/api/users/${id}`, { method: "DELETE" });
-        loadUsers();
+        if (!confirm("Bạn có chắc chắn muốn xóa người dùng này?")) return;
+        try {
+            const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+            if (res.ok) {
+                alert("Đã xóa người dùng!");
+                loadUsers();
+            }
+        } catch (err) { alert("Lỗi khi xóa người dùng."); }
     }
 
-    // --- QUẢN LÝ ITEMS (TIN ĐĂNG) ---
+    // --- QUẢN LÝ TIN ĐĂNG (ITEMS) ---
     async function loadAdminPosts() {
-        const res = await fetch("/api/admin/posts");
-        const posts = await res.json();
-        const table = document.getElementById("postTable");
-        table.innerHTML = "";
-        posts.forEach(p => {
-            table.innerHTML += `
-                <tr>
-                    <td>${p.id}</td>
-                    <td>${p.username}</td>
-                    <td>${p.item_name}</td>
-                    <td>${p.type == 'lost' ? 'Mất đồ' : 'Nhặt được'}</td>
-                    <td>${p.created_at}</td>
-                    <td><button class="btn-delete" onclick="deletePost(${p.id})">Xóa tin</button></td>
-                </tr>`;
-        });
+        try {
+            console.log("Đang tải danh sách bài đăng...");
+            const res = await fetch("/api/admin/posts");
+            if (!res.ok) throw new Error("Server trả về lỗi " + res.status);
+            
+            const posts = await res.json();
+            const table = document.getElementById("postTable"); 
+            if(!table) return;
+
+            table.innerHTML = ""; 
+            
+            if (posts.length === 0) {
+                table.innerHTML = "<tr><td colspan='6' style='text-align:center;'>Hiện chưa có bài đăng nào trên hệ thống.</td></tr>";
+                return;
+            }
+
+            posts.forEach(p => {
+                const typeLabel = p.type === 'lost' ? 
+                    '<b style="color:#ef4444">Mất đồ</b>' : 
+                    '<b style="color:#10b981">Nhặt được</b>';
+
+                table.innerHTML += `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td>${p.username || 'Ẩn danh'}</td>
+                        <td>${p.item_name}</td>
+                        <td>${typeLabel}</td>
+                        <td>${p.created_at}</td>
+                        <td>
+                            <button class="btn-delete" onclick="deletePost(${p.id})">
+                                <i class="fa-solid fa-trash-can"></i> Xóa
+                            </button>
+                        </td>
+                    </tr>`;
+            });
+        } catch (err) {
+            console.error("Lỗi kết nối API bài đăng:", err);
+            alert("Không thể kết nối đến máy chủ để lấy danh sách bài đăng.");
+        }
     }
 
     async function deletePost(id) {
-        if (!confirm("Xóa bài đăng này?")) return;
-        await fetch(`/api/admin/posts/${id}`, { method: "DELETE" });
-        loadAdminPosts();
+        if (!confirm("Xóa bài đăng này sẽ không thể hoàn tác. Bạn chắc chứ?")) return;
+
+        try {
+            const res = await fetch(`/api/admin/posts/${id}`, { method: "DELETE" });
+            if (res.ok) {
+                alert("Đã xóa bài viết thành công!");
+                loadAdminPosts();
+            } else {
+                alert("Lỗi: Không thể xóa bài viết này.");
+            }
+        } catch (err) {
+            alert("Lỗi kết nối server.");
+        }
     }
 
     function logout() {
-        localStorage.removeItem("currentUser");
-        window.location.href = "/";
+        if(confirm("Bạn muốn đăng xuất?")) {
+            localStorage.removeItem("currentUser");
+            window.location.href = "/";
+        }
     }
 
-    // Mặc định hiện Dashboard khi mới vào
-    showSection('dashboard');
-    loadUsers(); // Để cập nhật con số tổng user ở card
+    // Khởi tạo mặc định
+    window.onload = () => {
+        loadUsers(); // Để lấy số lượng tổng user cho Dashboard
+    };
 </script>
 
 </body>

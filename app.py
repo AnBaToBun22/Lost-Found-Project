@@ -23,7 +23,7 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='123456',
+        password='06012005',
         database='lost_found_db'
     )
  
@@ -596,30 +596,36 @@ def suggest_posts():
     scored.sort(key=lambda x: x['score'], reverse=True)
     return jsonify(scored[:5])
  
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
- 
-# API lấy tất cả bài đăng cho Admin
+# 1. API lấy bài đăng
+
 @app.route('/api/admin/posts')
 def admin_get_all_posts():
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    # Lấy tất cả bài viết, sắp xếp mới nhất lên đầu
-    cursor.execute("SELECT id, username, type, item_name, category, location, status, created_at FROM posts ORDER BY created_at DESC")
-    posts = cursor.fetchall()
-    
-    for p in posts:
-        p['created_at'] = str(p['created_at'])
-        
-    cursor.close(); conn.close()
-    return jsonify(posts)
- 
-# API Admin xóa bài đăng (không cần check user_id như User thường)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, username, type, item_name, created_at FROM posts ORDER BY created_at DESC")
+        posts = cursor.fetchall()
+        for p in posts:
+            p['created_at'] = str(p['created_at'])
+        cursor.close()
+        conn.close()
+        return jsonify(posts)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/admin/posts/<int:post_id>', methods=['DELETE'])
 def admin_delete_post(post_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM posts WHERE id=%s", (post_id,))
-    conn.commit()
-    cursor.close(); conn.close()
-    return jsonify({'message': 'Admin đã xóa bài đăng thành công!'})
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM posts WHERE id = %s", (post_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'message': 'Xóa thành công'}), 200
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+
+# DÒNG NÀY PHẢI LUÔN Ở CUỐI CÙNG FILE
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)

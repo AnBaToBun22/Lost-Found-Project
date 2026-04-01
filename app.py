@@ -192,6 +192,8 @@ def find_matches_for_post(post_id):
             matches.append({
                 'post_id': cand['id'],
                 'item_name': cand['item_name'],
+                'category': cand['category'], # Thêm dòng này
+                'location': cand['location'], # Thêm dòng này
                 'score': score,
                 'contact_user': cand['username'],
                 'distance_km': round(dist, 1) if dist != 9999 else "Không rõ"
@@ -217,7 +219,7 @@ def verify_user(user_id):
         return False
 
 
-# ── SỬA ĐỔI: Tích hợp lưu Map (latitude, longitude) ───────────────────
+# ── SỬA ĐỔI: Tích hợp lưu Map (latitude, longitude) và AUTO-MATCHING ───────────────────
 @app.route('/api/posts', methods=['POST'])
 def create_post():
     data = request.get_json()
@@ -235,7 +237,7 @@ def create_post():
         with open(filepath, 'wb') as f:
             f.write(base64.b64decode(img_data))
         image_url = f"/static/uploads/{filename}"
- 
+
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -256,13 +258,37 @@ def create_post():
     new_id = cursor.lastrowid
     cursor.close()
     conn.close()
+    
+    # =========================================================
+    # ── LOGIC AUTO-MATCHING XỬ LÝ TẠI BACKEND ──
+    # =========================================================
     matched_items = find_matches_for_post(new_id)
- 
-    # Trả về kết quả cho web
+    best_match = None
+
+    # Do hàm find_matches_for_post đã sắp xếp điểm từ cao xuống thấp
+    # Nên ta chỉ cần lấy phần tử đầu tiên kiểm tra xem có >= 90 điểm không
+    if matched_items and matched_items[0]['score'] >= 90:
+        best_match = matched_items[0]
+        
+        # 1. Mở lại kết nối và CẬP NHẬT DATABASE NGAY LẬP TỨC
+        conn_update = get_db_connection()
+        cursor_update = conn_update.cursor()
+        
+        # 2. Chuyển trạng thái của cả 2 bài thành 'resolved'
+        cursor_update.execute(
+            "UPDATE posts SET status='resolved' WHERE id IN (%s, %s)", 
+            (new_id, best_match['post_id'])
+        )
+        conn_update.commit()
+        cursor_update.close()
+        conn_update.close()
+
+    # 3. Trả về kết quả cho Web
     return jsonify({
         'message': 'Đăng tin thành công!', 
         'id': new_id,
-        'matches': matched_items
+        # Nếu có best_match >= 90 thì trả về mảng chứa nó, nếu không thì mảng rỗng []
+        'matches': [best_match] if best_match else []
     }), 201
 # ── Lấy danh sách bài đăng (có lọc) ──────────────────────────────
 @app.route('/api/posts', methods=['GET'])

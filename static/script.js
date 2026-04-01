@@ -356,7 +356,7 @@ function drawPinsOnMap(posts) {
 async function handlePost(e) {
     e.preventDefault();
     const btn = document.querySelector('#postForm .btn-submit');
-    btn.innerText = '⏳ Đang đăng và phân tích...'; // Đổi chữ cho ngầu
+    btn.innerText = '⏳ Đang đăng và phân tích...'; 
     btn.disabled = true;
 
     // Đọc ảnh dạng base64
@@ -377,12 +377,8 @@ async function handlePost(e) {
         item_name    : document.getElementById('itemName').value,
         category     : document.getElementById('itemCategory').value,
         location     : document.getElementById('itemLocation').value,
-        
-        // --- CHÚ Ý: ĐÃ THÊM LẠI 2 DÒNG TỌA ĐỘ BẢN ĐỒ ---
         latitude     : document.getElementById('latitude')?.value || '',
         longitude    : document.getElementById('longitude')?.value || '',
-        // ----------------------------------------------
-        
         lost_date    : document.getElementById('itemDate').value,
         description  : document.getElementById('itemDescription').value,
         secret_detail: document.getElementById('itemSecret')?.value || '',
@@ -395,28 +391,42 @@ async function handlePost(e) {
             headers: { 'Content-Type': 'application/json' },
             body   : JSON.stringify(payload)
         });
-        const data = await res.json();
+        const data = await res.json(); // Nhận data từ Python trả về
 
         if (res.ok) {
-            closeModal('postModal'); // Đóng form đăng tin
+            closeModal('postModal'); 
             document.getElementById('postForm').reset();
             document.getElementById('imagePreview').style.display = 'none';
-            loadPosts(); // Tải lại danh sách từ DB
+            
+            // Tải lại danh sách từ DB (Lúc này DB đã được Python cập nhật trạng thái nếu có match)
+            loadPosts(); 
 
-            // --- KIỂM TRA KẾT QUẢ TỪ AI VÀ HIỂN THỊ BẢNG (MỚI) ---
+            // =========================================================
+            // KIỂM TRA KẾT QUẢ AI MATCHING TỪ BACKEND TRẢ VỀ
+            // =========================================================
             if (data.matches && data.matches.length > 0) {
-                showAiMatchModal(data.matches, currentPostType); 
+                const bestMatch = data.matches[0];
+                
+                // Gán thêm thông tin bài đăng của chính user (lấy từ dữ liệu trả về hoặc payload)
+                const myPost = {
+                    item_name: payload.item_name,
+                    category: payload.category,
+                    location: payload.location
+                };
+
+                // Bật Modal BINGO báo hỉ 
+                showAutoMatchSuccess(myPost, bestMatch);
             } else {
-                // Nếu AI không tìm ra ai trùng khớp thì báo thành công bình thường
-                alert("✅ Đăng tin thành công! Hệ thống sẽ thông báo nếu tìm thấy đồ.");
+                // Nếu AI không tìm ra ai trùng khớp
+                alert("✅ Đăng tin thành công! AI đang theo dõi, hệ thống sẽ thông báo ngay khi có người đăng bài trùng khớp.");
             }
-            // -----------------------------------------------------
 
         } else {
             alert("❌ Lỗi: " + data.message);
         }
     } catch (err) {
         alert("Không kết nối được server!");
+        console.error(err);
     } finally {
         btn.innerText = '📮 Đăng tin';
         btn.disabled = false;
@@ -937,6 +947,7 @@ function updateLocationFields(coords) {
     document.getElementById('latitude').value = coords.lat;
     document.getElementById('longitude').value = coords.lng;
 }
+
 
 let isNewsLoaded = false; 
 // Hàm này được gọi tự động khi Google đăng nhập thành công
@@ -1554,6 +1565,95 @@ async function adminDeletePost(id) {
     const data = await res.json();
     alert(data.message);
     loadAdminPosts();
+}
+// =====================================================================
+// CHỨC NĂNG AI AUTO-MATCHING (TỰ ĐỘNG GHÉP ĐÔI > 90%)
+// =====================================================================
+
+function checkAndAutoMatch(newPost, allPostsArr) {
+    let matchFound = false;
+    let matchedPost = null;
+
+    for (let i = 0; i < allPostsArr.length; i++) {
+        let oldPost = allPostsArr[i];
+        
+        // Bỏ qua nếu cùng loại (mất - mất, nhặt - nhặt) hoặc đã giải quyết rồi
+        if (oldPost.type === newPost.type || oldPost.status === 'resolved') continue;
+
+        // --- BỘ ĐẾM ĐIỂM AI (MÔ PHỎNG) ---
+        let matchScore = 0;
+        
+        // 1. Cùng danh mục (Ví, Laptop...) -> +40 điểm
+        if (oldPost.category && newPost.category && oldPost.category === newPost.category) {
+            matchScore += 40;
+        }
+        
+        // 2. Cùng khu vực (Chứa từ khóa của nhau) -> +30 điểm
+        // Fix: Xử lý an toàn đề phòng location bị null/undefined
+        let oldLoc = (oldPost.location || "").toLowerCase();
+        let newLoc = (newPost.location || "").toLowerCase();
+        
+        if (oldLoc && newLoc && (oldLoc.includes(newLoc) || newLoc.includes(oldLoc))) {
+            matchScore += 30;
+        }
+            
+        // 3. Trùng ngày tháng -> +25 điểm
+        // Fix: Đổi 'date' thành 'lost_date' cho khớp với payload và DB
+        if (oldPost.lost_date === newPost.lost_date) {
+            matchScore += 25;
+        }
+
+        // Nếu đạt chuẩn >= 90%
+        if (matchScore >= 90) {
+            matchFound = true;
+            matchedPost = oldPost;
+            
+            // CẬP NHẬT TRẠNG THÁI 2 BÀI THÀNH "ĐÃ GIẢI QUYẾT"
+            allPostsArr[i].status = 'resolved';
+            newPost.status = 'resolved';
+            
+            // Gắn ID của nhau để admin dễ quản lý
+            allPostsArr[i].matchedWith = newPost.id;
+            newPost.matchedWith = oldPost.id;
+            
+            break; // Tìm thấy 1 người là chốt đơn luôn
+        }
+    }
+
+    if (matchFound) {
+        // Bật Modal thông báo cho user
+        showAutoMatchSuccess(newPost, matchedPost);
+        return true;
+    }
+    
+    return false;
+}
+// Hàm hiển thị giao diện BINGO khi ghép đôi thành công
+function showAutoMatchSuccess(post1, post2) {
+    const modal = document.getElementById('aiMatchModal');
+    const textObj = document.getElementById('aiMatchText');
+    const listObj = document.getElementById('aiMatchList');
+
+    if (!modal || !textObj || !listObj) return;
+
+    textObj.innerHTML = `<span style="color: #27ae60; font-size: 18px; display:block; margin-bottom:10px;">🎉 <b>BINGO! ĐỘ TRÙNG KHỚP > 90%</b></span>
+                         Hệ thống AI đã tự động ghép đôi bài đăng của bạn với một bài có sẵn trên hệ thống. 
+                         Trạng thái của cả 2 bài đã được đổi thành <b>✅ Đã giải quyết</b>!`;
+    
+    listObj.innerHTML = `
+        <div style="padding: 12px; border: 1px solid #2ecc71; border-radius: 8px; background: #e9f7ef; margin-bottom: 10px; color:#1c1e21;">
+            <strong>Bài của bạn:</strong> ${post1.item_name || post1.name} <br>
+            <span style="font-size:12px; color:#555;"><i class="fa-solid fa-tag"></i> ${post1.category} | <i class="fa-solid fa-location-dot"></i> ${post1.location}</span>
+        </div>
+        <div style="text-align: center; color: #e74c3c; font-size: 20px; margin: 10px 0;"><i class="fa-solid fa-link"></i></div>
+        <div style="padding: 12px; border: 1px solid #3498db; border-radius: 8px; background: #ebf5fb; color:#1c1e21;">
+            <strong>Bài đối tác:</strong> ${post2.item_name || post2.name} <br>
+            <span style="font-size:12px; color:#555;"><i class="fa-solid fa-tag"></i> ${post2.category} | <i class="fa-solid fa-location-dot"></i> ${post2.location}</span>
+        </div>
+        <p style="margin-top:15px; font-size:13px; color:#e67e22; text-align:center;">Vui lòng kiểm tra mục thông báo hoặc thông tin liên hệ để trao đổi!</p>
+    `;
+
+    modal.style.display = 'flex';
 }
 
 // Gọi hàm này khi trang web vừa mở

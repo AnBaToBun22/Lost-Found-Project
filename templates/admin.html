@@ -70,11 +70,11 @@
                 <i class="fa-solid fa-users"></i>
             </div>
             <div class="card">
-                <div><p>Đồ thất lạc</p><h3>24</h3></div>
+                <div><p>Đồ thất lạc</p><h3 id="stat-posts">0</h3></div>
                 <i class="fa-solid fa-magnifying-glass"></i>
             </div>
             <div class="card">
-                <div><p>Đã tìm thấy</p><h3>15</h3></div>
+                <div><p>Đã tìm thấy</p><h3 id="stat-resolved">0</h3></div>
                 <i class="fa-solid fa-circle-check"></i>
             </div>
         </div>
@@ -243,6 +243,37 @@
     window.onload = () => {
         loadUsers(); // Để lấy số lượng tổng user cho Dashboard
     };
+// Hàm tự động tải thống kê: Đồ thất lạc & Đã tìm thấy
+async function loadAdminStats() {
+    try {
+        const res = await fetch('/api/admin/stats');
+        
+        // Nếu API bị lỗi (VD: chưa restart server), nó sẽ báo ở đây
+        if (!res.ok) throw new Error("API lỗi hoặc chưa tồn tại!");
+        
+        const data = await res.json();
+        
+        // Cập nhật số liệu Đồ thất lạc (Tổng số bài đăng)
+        const postsEl = document.getElementById('stat-posts');
+        if (postsEl) {
+            postsEl.innerText = data.total_posts;
+        }
+        
+        // Cập nhật số liệu Đã tìm thấy (Bài đăng đã giải quyết)
+        const resolvedEl = document.getElementById('stat-resolved');
+        if (resolvedEl) {
+            resolvedEl.innerText = data.resolved_posts;
+        }
+        
+    } catch (error) {
+        console.error("Lỗi khi tải thống kê Admin:", error);
+    }
+}
+
+// Gọi tự động khi vào trang Admin
+document.addEventListener("DOMContentLoaded", function() {
+    loadAdminStats();
+});
 </script>
 
 </body>

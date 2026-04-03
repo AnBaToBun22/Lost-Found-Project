@@ -23,7 +23,7 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='06012005',
+        password='123456',
         database='lost_found_db'
     )
  
@@ -274,9 +274,9 @@ def create_post():
         conn_update = get_db_connection()
         cursor_update = conn_update.cursor()
         
-        # 2. Chuyển trạng thái của cả 2 bài thành 'resolved'
+        # 2. Chuyển trạng thái của cả 2 bài thành 'matching'
         cursor_update.execute(
-            "UPDATE posts SET status='resolved' WHERE id IN (%s, %s)", 
+            "UPDATE posts SET status='matching' WHERE id IN (%s, %s)", 
             (new_id, best_match['post_id'])
         )
         conn_update.commit()
@@ -502,22 +502,44 @@ def add_comment(post_id):
     data = request.get_json()
     if not verify_user(data.get('user_id')):
         return jsonify({'message': 'Bạn cần đăng nhập để bình luận!'}), 401
+    
     conn   = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True) # Đổi thành dictionary để lấy tên bài viết dễ hơn
     try:
         parent_id = data.get('parent_id') or None
+        
+        # 1. Lưu bình luận vào Database
         cursor.execute(
             """INSERT INTO comments (post_id, user_id, username, content, parent_id)
                VALUES (%s, %s, %s, %s, %s)""",
             (post_id, data['user_id'], data['username'], data['content'], parent_id)
         )
+        
+        # 2. TẠO THÔNG BÁO CHO CHỦ BÀI ĐĂNG
+        # Lấy thông tin chủ bài đăng
+        cursor.execute("SELECT user_id, item_name FROM posts WHERE id = %s", (post_id,))
+        post = cursor.fetchone()
+        
+        # Chỉ gửi thông báo nếu người comment KHÔNG PHẢI là chủ bài đăng
+        if post and post['user_id'] != data['user_id']:
+            # Cắt ngắn nội dung comment nếu dài quá (hiển thị cho đẹp)
+            short_content = data['content'][:30] + "..." if len(data['content']) > 30 else data['content']
+            
+            # Tạo lời thông báo y hệt thiết kế của bạn
+            msg = f"<b>{data['username']}</b> vừa bình luận vào bài đăng '{post['item_name']}' của bạn: '{short_content}'"
+            
+            cursor.execute(
+                "INSERT INTO notifications (user_id, message, post_id) VALUES (%s, %s, %s)",
+                (post['user_id'], msg, post_id)
+            )
+
         conn.commit()
         return jsonify({'message': 'Đã thêm bình luận!'}), 201
     except Exception as e:
         return jsonify({'message': str(e)}), 500
     finally:
-        cursor.close(); conn.close()
- 
+        cursor.close()
+        conn.close()
  
 # ── Unresolve ────────────────────────────────────────────────────
 @app.route('/api/posts/<int:post_id>/unresolve', methods=['PUT'])
@@ -613,6 +635,32 @@ def admin_get_all_posts():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# API Thống kê cho Admin Dashboard
+@app.route('/api/admin/stats', methods=['GET'])
+def admin_get_stats():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # 1. Đếm TẤT CẢ bài đăng (cho ô Đồ thất lạc - không phân biệt mất hay nhặt)
+    cursor.execute("SELECT COUNT(*) as total FROM posts")
+    total_posts = cursor.fetchone()['total']
+    
+    # 2. Đếm các bài ĐÃ GIẢI QUYẾT (cho ô Đã tìm thấy)
+    cursor.execute("SELECT COUNT(*) as total FROM posts WHERE status = 'resolved'")
+    resolved_posts = cursor.fetchone()['total']
+
+    # (Tùy chọn: Nếu bạn cần API này trả về luôn số User để đắp lên thì để dòng dưới, không thì bỏ qua)
+    cursor.execute("SELECT COUNT(*) as total FROM users WHERE username != 'admin'")
+    total_users = cursor.fetchone()['total']
+    
+    cursor.close()
+    conn.close()
+    
+    return jsonify({
+        "total_posts": total_posts,
+        "resolved_posts": resolved_posts,
+        "total_users": total_users # Dữ liệu user vẫn giữ nguyên 
+    })
 @app.route('/api/admin/posts/<int:post_id>', methods=['DELETE'])
 def admin_delete_post(post_id):
     try:
@@ -625,7 +673,40 @@ def admin_delete_post(post_id):
         return jsonify({'message': 'Xóa thành công'}), 200
     except Exception as e:
         return jsonify({'message': str(e)}), 500
+# API Lấy danh sách thông báo của User
+@app.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify([])
+        
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    # Lấy 10 thông báo mới nhất
+    cursor.execute("SELECT * FROM notifications WHERE user_id = %s ORDER BY created_at DESC LIMIT 10", (user_id,))
+    notifs = cursor.fetchall()
+    
+    # Ép kiểu thời gian
+    for n in notifs:
+        n['created_at'] = str(n['created_at'])
+        
+    cursor.close()
+    conn.close()
+    return jsonify(notifs)
 
-# DÒNG NÀY PHẢI LUÔN Ở CUỐI CÙNG FILE
+# API Đánh dấu đã đọc (Tắt chấm đỏ)
+@app.route('/api/notifications/read', methods=['PUT'])
+def mark_notifications_read():
+    data = request.json
+    user_id = data.get('user_id')
+    if user_id:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE notifications SET is_read = TRUE WHERE user_id = %s", (user_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    return jsonify({'message': 'OK'})
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

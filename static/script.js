@@ -1638,7 +1638,7 @@ function showAutoMatchSuccess(post1, post2) {
 
     textObj.innerHTML = `<span style="color: #27ae60; font-size: 18px; display:block; margin-bottom:10px;">🎉 <b>BINGO! ĐỘ TRÙNG KHỚP > 90%</b></span>
                          Hệ thống AI đã tự động ghép đôi bài đăng của bạn với một bài có sẵn trên hệ thống. 
-                         Trạng thái của cả 2 bài đã được đổi thành <b>✅ Đã giải quyết</b>!`;
+                         Trạng thái của cả 2 bài đã được đổi thành <b>⏳ Đang ghép</b>!`;
     
     listObj.innerHTML = `
         <div style="padding: 12px; border: 1px solid #2ecc71; border-radius: 8px; background: #e9f7ef; margin-bottom: 10px; color:#1c1e21;">
@@ -1655,6 +1655,91 @@ function showAutoMatchSuccess(post1, post2) {
 
     modal.style.display = 'flex';
 }
+// ==========================================
+// HỆ THỐNG THÔNG BÁO (NOTIFICATIONS)
+// ==========================================
 
-// Gọi hàm này khi trang web vừa mở
+// Hàm tải thông báo từ server
+async function loadNotifications() {
+    if (!currentUser) return; // Không có user đăng nhập thì không tải
+    
+    try {
+        const res = await fetch(`/api/notifications?user_id=${currentUser.id}`);
+        const notifs = await res.json();
+        
+        const notifList = document.getElementById('notifList'); // Thay bằng ID thẻ div chứa danh sách thông báo của bạn
+        const notifBadge = document.getElementById('notifBadge'); // Thay bằng ID cái chấm đỏ của bạn
+        
+        if (!notifList) return;
+        
+        // Đếm số thông báo chưa đọc
+        const unreadCount = notifs.filter(n => !n.is_read).length;
+        
+        // Hiển thị chấm đỏ nếu có thông báo mới
+        if (notifBadge) {
+            if (unreadCount > 0) {
+                notifBadge.style.display = 'block';
+                notifBadge.innerText = unreadCount;
+            } else {
+                notifBadge.style.display = 'none';
+            }
+        }
+        
+        // Hiển thị danh sách thông báo
+        if (notifs.length === 0) {
+            notifList.innerHTML = '<div style="padding:15px; text-align:center; color:#888;">Không có thông báo nào</div>';
+            return;
+        }
+        
+        let html = '';
+        notifs.forEach(n => {
+            // Hiệu ứng nền hơi xanh nếu chưa đọc
+            const bgClass = n.is_read ? '' : 'background-color: #f0f8ff;'; 
+            
+            html += `
+                <div onclick="openDetailModal(${n.post_id})" style="padding: 12px 15px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; ${bgClass}">
+                    <div style="width:35px; height:35px; border-radius:50%; background:#e8f5e9; color:#2ecc71; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <i class="fa-solid fa-comment-dots"></i>
+                    </div>
+                    <div>
+                        <p style="margin:0; font-size:14px; color:#333;">${n.message}</p>
+                        <span style="font-size:12px; color:#3498db;">${formatTime(n.created_at)}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        notifList.innerHTML = html;
+        
+    } catch (error) {
+        console.error("Lỗi tải thông báo:", error);
+    }
+}
+
+// Hàm mở hộp thoại thông báo và tắt chấm đỏ
+function toggleNotifDropdown() {
+    const box = document.getElementById('notifDropdownBox'); // ID hộp thoại xổ xuống của bạn
+    if (box) {
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        
+        // Nếu vừa mở ra, gọi API đánh dấu là đã đọc
+        if (box.style.display === 'block' && currentUser) {
+            fetch('/api/notifications/read', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUser.id })
+            }).then(() => {
+                const badge = document.getElementById('notifBadge');
+                if (badge) badge.style.display = 'none'; // Ẩn ngay chấm đỏ
+            });
+        }
+    }
+}
+
+// Tự động tải thông báo sau khi trang web load xong 2 giây (đợi dữ liệu user ổn định)
+setTimeout(loadNotifications, 2000);
+
+// Nâng cao: Tự động refresh thông báo mỗi 30 giây (Real-time nhè nhẹ)
+setInterval(loadNotifications, 30000);
+
 loadAdminPosts();

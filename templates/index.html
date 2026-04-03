@@ -126,41 +126,20 @@
         <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-end;">
             <div id="adminButton"></div>
             
-            <div class="notif-container" style="position: relative;">
-                <div onclick="toggleNotif()" style="width: 40px; height: 40px; border-radius: 50%; background: #e4e6eb; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #050505; font-size: 20px; transition: 0.2s; position: relative;" onmouseover="this.style.background='#d8dadf'" onmouseout="this.style.background='#e4e6eb'">
-                    <i class="fa-solid fa-bell"></i>
-                    <span style="position: absolute; top: -2px; right: -2px; background: #e74c3c; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></span>
-                </div>
-                
-                <div id="notifDropdown" class="notif-dropdown">
-                    <div class="notif-header">Thông báo</div>
-                    
-                    <div class="notif-item">
-                        <div class="notif-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                        <div class="notif-content">
-                            <p><strong>Hệ thống Admin</strong> đã duyệt và hiển thị bài đăng "Ví da nam màu đen" của bạn.</p>
-                            <span>10 phút trước</span>
-                        </div>
-                    </div>
-
-                    <div class="notif-item">
-                        <div class="notif-icon" style="color: #2ecc71; background: #e9f7ef;"><i class="fa-solid fa-comment-dots"></i></div>
-                        <div class="notif-content">
-                            <p><strong>Nguyễn Văn A</strong> vừa bình luận vào bài đăng của bạn: "Mình có nhặt được cái này ở khu nhà xe A..."</p>
-                            <span>1 giờ trước</span>
-                        </div>
-                    </div>
-
-                    <div class="notif-item">
-                        <div class="notif-icon" style="color: #e67e22; background: #fcf3eb;"><i class="fa-solid fa-robot"></i></div>
-                        <div class="notif-content">
-                            <p>Hệ thống AI vừa tìm thấy <strong>1 món đồ</strong> có độ trùng khớp cao với mô tả của bạn!</p>
-                            <span>Hôm qua lúc 14:30</span>
-                        </div>
-                    </div>
-                </div>
+    <div class="notif-container" style="position: relative;">
+    <div onclick="toggleNotifDropdown()" style="width: 40px; height: 40px; border-radius: 50%; background: #e4e6eb; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #050505; font-size: 20px; transition: 0.2s; position: relative;" onmouseover="this.style.background='#d8dadf'" onmouseout="this.style.background='#e4e6eb'">
+        <i class="fa-solid fa-bell"></i>
+        
+        <span id="notifBadge" style="display: none; position: absolute; top: -5px; right: -5px; background: #e74c3c; color: white; font-size: 11px; font-weight: bold; width: 18px; height: 18px; border-radius: 50%; justify-content: center; align-items: center; border: 2px solid white;">0</span>
+    </div>
+    
+    <div id="notifDropdownBox" class="notif-dropdown" style="display: none;">
+        <div class="notif-header">Thông báo</div>
+        
+        <div id="notifList" style="max-height: 350px; overflow-y: auto;">
             </div>
-            
+    </div>
+</div>
             <div class="user-area" id="userArea">
                 <button class="btn-login" onclick="openAuthModal()" style="background: #e4e6eb; border: none; color: #050505; font-weight: 600; padding: 8px 15px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: 0.2s;" onmouseover="this.style.background='#d8dadf'" onmouseout="this.style.background='#e4e6eb'">
                     <i class="fa-regular fa-user"></i> Đăng nhập
@@ -238,7 +217,7 @@
                 <button class="tab-btn active" onclick="filterType('all')" style="background: #3498db; color: #fff; border: none;">Tất cả</button>
                 <button class="tab-btn" onclick="filterType('lost')" style="background: #fff; color: #65676b; border: 1px solid #ddd;">Đang tìm</button>
                 <button class="tab-btn" onclick="filterType('found')" style="background: #fff; color: #65676b; border: 1px solid #ddd;">Đã nhặt được</button>
-                <button class="tab-btn tab-resolved" onclick="filterType('resolved')" style="background: #fff; color: #65676b; border: 1px solid #ddd;">✅ Đã giải quyết</button>
+                <button class="tab-btn tab-resolved" onclick="filterType('resolved')" style="background: #fff; color: #65676b; border: 1px solid #ddd;">⏳ Đang ghép</button>
             </div>
 
             <div id="itemsGrid" class="items-grid fb-style-grid"></div>
@@ -274,7 +253,6 @@
             </div>
             
             <div style="font-size: 12px; color: #65676b; margin-top: 10px;">
-                Lost & Found System © 2026<br>Modern Light Theme.
             </div>
         </aside>
 

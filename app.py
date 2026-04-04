@@ -540,8 +540,47 @@ def add_comment(post_id):
     finally:
         cursor.close()
         conn.close()
- 
-# ── Unresolve ────────────────────────────────────────────────────
+# ── Sửa bình luận ────────────────────────────────────────────────
+@app.route('/api/comments/<int:comment_id>', methods=['PUT'])
+def update_comment(comment_id):
+    data = request.get_json()
+    user_id = data.get('user_id')
+    new_content = data.get('content')
+
+    if not user_id or not new_content:
+        return jsonify({'message': 'Thiếu thông tin'}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Câu lệnh WHERE kèm theo user_id để đảm bảo chỉ chủ bình luận mới sửa được
+    cursor.execute(
+        "UPDATE comments SET content = %s WHERE id = %s AND user_id = %s",
+        (new_content, comment_id, user_id)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return jsonify({'message': 'Đã sửa bình luận'})
+
+# ── Xóa bình luận ────────────────────────────────────────────────
+@app.route('/api/comments/<int:comment_id>', methods=['DELETE'])
+def delete_comment(comment_id):
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return jsonify({'message': 'Thiếu user_id'}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Kèm user_id để tránh người khác dùng API xóa trộm
+    cursor.execute(
+        "DELETE FROM comments WHERE id = %s AND user_id = %s",
+        (comment_id, user_id)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return jsonify({'message': 'Đã xóa bình luận'})
 @app.route('/api/posts/<int:post_id>/unresolve', methods=['PUT'])
 def unresolve_post(post_id):
     user_id = request.args.get('user_id')

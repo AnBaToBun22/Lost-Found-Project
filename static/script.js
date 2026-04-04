@@ -595,7 +595,20 @@ function showPostDetail(postId) {
 
     // 5. Mở Modal lên
     document.getElementById('postDetailModal').style.display = 'flex';
+    // 5.1 Ẩn khung bình luận cũ đi (để người dùng tự bấm mở nếu muốn)
+    const commentSection = document.getElementById('commentSection');
+    if (commentSection) commentSection.style.display = 'none';
+    
+    // 5.2 Reset lại chữ trên nút đếm bình luận
+    const label = document.getElementById('commentCountLabel');
+    if (label) label.textContent = 'Bình luận (0)';
+    
+    // 5.3 Xóa sạch danh sách bình luận cũ hiển thị trên màn hình
+    const list = document.getElementById('commentList');
+    if (list) list.innerHTML = '';
 
+    // 5.4 Chủ động gọi API tải luôn bình luận của đúng bài này để đắp số lượng thật lên nút
+    loadComments(postId);
     // 6. XỬ LÝ BẢN ĐỒ CHI TIẾT
     setTimeout(() => {
         const lat = parseFloat(post.latitude);
@@ -1251,6 +1264,9 @@ function buildCommentHTML(c, isReply = false) {
         ? c.replies.map(r => buildCommentHTML(r, true)).join('')
         : '';
 
+    // Kiểm tra xem người đang đăng nhập có phải là chủ của bình luận này không
+    const isMyComment = currentUser && currentUser.id === c.user_id;
+
     return `
         <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;${marginLeft}">
             <div style="width:${avatarSize};height:${avatarSize};border-radius:50%;background:linear-gradient(135deg,#4A90E2,#6366f1);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;flex-shrink:0;">
@@ -1259,7 +1275,7 @@ function buildCommentHTML(c, isReply = false) {
             <div style="flex:1;">
                 <div style="background:#f1f5f9;border-radius:12px;padding:8px 12px;display:inline-block;max-width:100%;">
                     <span style="font-size:12px;font-weight:700;color:#1a1a2e;display:block;margin-bottom:2px;">${c.username}</span>
-                    <p style="font-size:${fontSize};color:#444;margin:0;">${c.content}</p>
+                    <p id="comment_text_${c.id}" style="font-size:${fontSize};color:#444;margin:0;">${c.content}</p>
                 </div>
                 <div style="display:flex;gap:12px;margin-top:3px;padding-left:4px;">
                     <span style="font-size:10.5px;color:#94a3b8;">${formatTime(c.created_at)}</span>
@@ -1267,6 +1283,17 @@ function buildCommentHTML(c, isReply = false) {
                         style="font-size:11px;font-weight:700;color:#64748b;background:none;border:none;cursor:pointer;padding:0;">
                         Trả lời
                     </button>` : ''}
+                    
+                    ${isMyComment ? `
+                    <button onclick="editComment(${c.id})"
+                        style="font-size:11px;font-weight:700;color:#4A90E2;background:none;border:none;cursor:pointer;padding:0;">
+                        Sửa
+                    </button>
+                    <button onclick="deleteComment(${c.id})"
+                        style="font-size:11px;font-weight:700;color:#e74c3c;background:none;border:none;cursor:pointer;padding:0;">
+                        Xóa
+                    </button>
+                    ` : ''}
                 </div>
                 <div id="replyInput_${c.id}" style="display:none;margin-top:6px;margin-left:4px;">
                     <div style="display:flex;gap:7px;align-items:center;">
@@ -1289,7 +1316,45 @@ function buildCommentHTML(c, isReply = false) {
             </div>
         </div>`;
 }
+// --- Hàm Sửa bình luận ---
+async function editComment(commentId) {
+    const pElem = document.getElementById(`comment_text_${commentId}`);
+    const currentText = pElem.innerText;
+    
+    // Mở hộp thoại nhập liệu mặc định của trình duyệt để sửa cho nhanh & gọn
+    const newText = prompt("Chỉnh sửa bình luận của bạn:", currentText);
+    
+    if (newText !== null && newText.trim() !== "" && newText !== currentText) {
+        try {
+            const res = await fetch(`/api/comments/${commentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUser.id, content: newText.trim() })
+            });
+            if (res.ok) {
+                loadComments(currentDetailPostId); // Tải lại danh sách bình luận ngay lập tức
+            } else {
+                alert("Lỗi khi sửa bình luận!");
+            }
+        } catch(e) { console.error(e); alert('Không kết nối được server!'); }
+    }
+}
 
+// --- Hàm Xóa bình luận ---
+async function deleteComment(commentId) {
+    if (!confirm("Bạn có chắc chắn muốn xóa bình luận này không?")) return;
+    
+    try {
+        const res = await fetch(`/api/comments/${commentId}?user_id=${currentUser.id}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            loadComments(currentDetailPostId); // Tải lại danh sách bình luận ngay lập tức
+        } else {
+            alert("Lỗi khi xóa bình luận!");
+        }
+    } catch(e) { console.error(e); alert('Không kết nối được server!'); }
+}
 function showReplyInput(commentId, username) {
     // Ẩn tất cả reply input khác
     document.querySelectorAll('[id^="replyInput_"]').forEach(el => {
@@ -1566,6 +1631,83 @@ async function adminDeletePost(id) {
     alert(data.message);
     loadAdminPosts();
 }
+// =========================================================
+// DASHBOARD WIDGETS (BIỂU ĐỒ & HOẠT ĐỘNG GẦN ĐÂY)
+// =========================================================
+async function renderDashboardWidgets() {
+    try {
+        // Gọi API lấy toàn bộ bài đăng từ Database
+        const res = await fetch("/api/admin/posts");
+        const posts = await res.json();
+
+        // 1. XỬ LÝ BIỂU ĐỒ (Đếm số bài Lost và Found)
+        let lostCount = 0;
+        let foundCount = 0;
+        posts.forEach(p => {
+            if (p.type === 'lost') lostCount++;
+            else foundCount++;
+        });
+
+        // Vẽ biểu đồ nếu tìm thấy thẻ canvas có id="typeChart"
+        const ctx = document.getElementById('typeChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'doughnut', // Biểu đồ hình bánh Donut
+                data: {
+                    labels: ['Mất đồ', 'Nhặt được'],
+                    datasets: [{
+                        data: [lostCount, foundCount],
+                        backgroundColor: ['#FF6B6B', '#1DD1A1'], // Đỏ cho Mất, Xanh cho Nhặt
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        // 2. XỬ LÝ BẢNG HOẠT ĐỘNG GẦN ĐÂY (Lấy 5 bài mới nhất)
+        const recentList = document.getElementById('recentActivityList');
+        if (recentList) {
+            recentList.innerHTML = '';
+            
+            // Lấy 5 phần tử đầu tiên (Vì API đã sắp xếp mới nhất lên đầu)
+            const top5 = posts.slice(0, 5); 
+            
+            top5.forEach(p => {
+                // Đổi màu tag tùy theo loại bài đăng
+                const typeHtml = p.type === 'lost' 
+                    ? '<span style="background:#ffeaa7; color:#d35400; padding:3px 8px; border-radius:12px; font-size:12px;">Mất đồ</span>' 
+                    : '<span style="background:#e0f7fa; color:#009688; padding:3px 8px; border-radius:12px; font-size:12px;">Nhặt được</span>';
+                
+                // Cắt lấy phần ngày tháng năm, bỏ qua giờ phút giây cho gọn
+                const dateOnly = p.created_at ? p.created_at.split(' ')[0] : 'Không rõ';
+
+                recentList.innerHTML += `
+                    <tr style="border-bottom: 1px solid #f5f5f5;">
+                        <td style="padding: 12px 10px; font-weight: bold; color: #4A90E2;">${p.username}</td>
+                        <td style="padding: 12px 10px;">${p.item_name}</td>
+                        <td style="padding: 12px 10px;">${typeHtml}</td>
+                        <td style="padding: 12px 10px; color: #888; font-size: 13px;">${dateOnly}</td>
+                    </tr>
+                `;
+            });
+        }
+
+    } catch (error) {
+        console.error("Lỗi khi tải Widgets:", error);
+    }
+}
+
+// Chạy hàm vẽ biểu đồ khi trang web tải xong
+document.addEventListener("DOMContentLoaded", function() {
+    renderDashboardWidgets();
+});
 // =====================================================================
 // CHỨC NĂNG AI AUTO-MATCHING (TỰ ĐỘNG GHÉP ĐÔI > 90%)
 // =====================================================================
@@ -1741,5 +1883,6 @@ setTimeout(loadNotifications, 2000);
 
 // Nâng cao: Tự động refresh thông báo mỗi 30 giây (Real-time nhè nhẹ)
 setInterval(loadNotifications, 30000);
+// Hàm render Biểu đồ và Hoạt động gần đây cho Dashboard
 
 loadAdminPosts();

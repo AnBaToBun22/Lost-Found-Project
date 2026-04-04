@@ -77,6 +77,27 @@
                 <div><p>Đã tìm thấy</p><h3 id="stat-resolved">0</h3></div>
                 <i class="fa-solid fa-circle-check"></i>
             </div>
+</div> <div style="padding: 0 30px 30px 30px;">
+            <div class="widget-recent" style="width: 100%; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                <h4 style="margin-bottom: 20px; color: #333;"><i class="fa-solid fa-clock-rotate-left"></i> Hoạt động gần đây (5 bài mới nhất)</h4>
+                <div class="table-responsive">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #eee; color: #888;">
+                                <th style="padding: 10px;">Người đăng</th>
+                                <th style="padding: 10px;">Vật phẩm</th>
+                                <th style="padding: 10px;">Loại</th>
+                                <th style="padding: 10px;">Thời gian</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentActivityList">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+    </div>
         </div>
     </div>
 
@@ -273,6 +294,49 @@ async function loadAdminStats() {
 // Gọi tự động khi vào trang Admin
 document.addEventListener("DOMContentLoaded", function() {
     loadAdminStats();
+});
+async function loadRecentActivities() {
+    try {
+        // Gọi API lấy toàn bộ bài đăng (bạn đã có sẵn API này ở backend)
+        const res = await fetch("/api/admin/posts");
+        const posts = await res.json();
+
+        const tbody = document.getElementById('recentActivityList');
+        if (!tbody) return; // Nếu không tìm thấy bảng thì thoát
+
+        tbody.innerHTML = ''; // Xóa trắng dữ liệu cũ
+
+        // Cắt lấy đúng 5 bài đầu tiên (mới nhất)
+        const top5 = posts.slice(0, 5); 
+
+        // Lặp qua 5 bài và in từng dòng <tr> ra bảng
+        top5.forEach(p => {
+            // Chỉnh màu cho đẹp: Đỏ cho Mất đồ, Xanh cho Nhặt được
+            const typeHtml = p.type === 'lost' 
+                ? '<span style="background:#ffeaa7; color:#d35400; padding:3px 8px; border-radius:12px; font-size:12px;">Mất đồ</span>' 
+                : '<span style="background:#e0f7fa; color:#009688; padding:3px 8px; border-radius:12px; font-size:12px;">Nhặt được</span>';
+            
+            // Lấy ngày tháng, bỏ giờ phút giây
+            const dateOnly = p.created_at ? p.created_at.split(' ')[0] : 'Không rõ';
+
+            // Bơm HTML vào bảng
+            tbody.innerHTML += `
+                <tr style="border-bottom: 1px solid #f5f5f5;">
+                    <td style="padding: 12px 10px; font-weight: bold; color: #4A90E2;">${p.username}</td>
+                    <td style="padding: 12px 10px;">${p.item_name}</td>
+                    <td style="padding: 12px 10px;">${typeHtml}</td>
+                    <td style="padding: 12px 10px; color: #888; font-size: 13px;">${dateOnly}</td>
+                </tr>
+            `;
+        });
+    } catch (error) {
+        console.error("Lỗi khi tải bảng hoạt động gần đây:", error);
+    }
+}
+
+// Chạy hàm ngay khi trang web Admin load xong
+document.addEventListener("DOMContentLoaded", function() {
+    loadRecentActivities();
 });
 </script>
 

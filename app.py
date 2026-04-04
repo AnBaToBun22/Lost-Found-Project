@@ -231,7 +231,7 @@ def create_post():
     # Nhận ảnh base64 và lưu thành file
     image_url = None
     if data.get('image_base64'):
-        img_data = data['image_base64'].split(',')[1]  # Bỏ phần "data:image/...;base64,"
+        img_data = data['image_base64'].split(',')[1]  
         filename = f"{uuid.uuid4().hex}.jpg"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         with open(filepath, 'wb') as f:
@@ -240,54 +240,55 @@ def create_post():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Đã thêm latitude và longitude vào câu lệnh SQL
-    sql = """
-        INSERT INTO posts (user_id, username, type, item_name, category,
-                           location, latitude, longitude, lost_date, description, image_url, secret_detail)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """
-    cursor.execute(sql, (
-        data['user_id'], data['username'], data['type'],
-        data['item_name'], data['category'], data['location'],
-        data.get('latitude', ''), data.get('longitude', ''),  # Truyền tọa độ vào DB
-        data['lost_date'], data['description'],
-        image_url, data.get('secret_detail', '')
-    ))
-    conn.commit()
-    new_id = cursor.lastrowid
-    cursor.close()
-    conn.close()
-    
-    # =========================================================
-    # ── LOGIC AUTO-MATCHING XỬ LÝ TẠI BACKEND ──
-    # =========================================================
-    matched_items = find_matches_for_post(new_id)
+    new_id = None
     best_match = None
-
-    # Do hàm find_matches_for_post đã sắp xếp điểm từ cao xuống thấp
-    # Nên ta chỉ cần lấy phần tử đầu tiên kiểm tra xem có >= 90 điểm không
-    if matched_items and matched_items[0]['score'] >= 90:
-        best_match = matched_items[0]
+    
+    try:
+        # 1. THÊM BÀI ĐĂNG (VÀ COMMIT NGAY ĐỂ MỞ KHÓA BẢNG CHO CÁC HÀM KHÁC)
+        sql = """
+            INSERT INTO posts (user_id, username, type, item_name, category,
+                               location, latitude, longitude, lost_date, description, image_url, secret_detail)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql, (
+            data['user_id'], data['username'], data['type'],
+            data['item_name'], data['category'], data['location'],
+            data.get('latitude', ''), data.get('longitude', ''),  
+            data['lost_date'], data['description'],
+            image_url, data.get('secret_detail', '')
+        ))
+        conn.commit()
+        new_id = cursor.lastrowid
         
-        # 1. Mở lại kết nối và CẬP NHẬT DATABASE NGAY LẬP TỨC
-        conn_update = get_db_connection()
-        cursor_update = conn_update.cursor()
-        
-        # 2. Chuyển trạng thái của cả 2 bài thành 'matching'
-        cursor_update.execute(
-            "UPDATE posts SET status='matching' WHERE id IN (%s, %s)", 
-            (new_id, best_match['post_id'])
-        )
-        conn_update.commit()
-        cursor_update.close()
-        conn_update.close()
+        # =========================================================
+        # ── LOGIC AUTO-MATCHING XỬ LÝ TẠI BACKEND ──
+        # =========================================================
+        matched_items = find_matches_for_post(new_id)
 
-    # 3. Trả về kết quả cho Web
+        if matched_items and matched_items[0]['score'] >= 90:
+            best_match = matched_items[0]
+            
+            # Dùng luôn cái cursor đang có, không tạo thêm conn_update nữa để tránh kẹt Lock!
+            # Đổi về trạng thái 'resolved' để không vi phạm kiểu dữ liệu ENUM của MySQL
+            cursor.execute(
+                "UPDATE posts SET status='resolved' WHERE id IN (%s, %s)", 
+                (new_id, best_match['post_id'])
+            )
+            conn.commit()
+
+    except Exception as e:
+        print("Lỗi nghiêm trọng trong quá trình đăng tin/ghép đôi:", str(e))
+        conn.rollback() # Nếu có lỗi xảy ra, trả lại nguyên trạng để không bị kẹt DB
+
+    finally:
+        # BẤT CHẤP THÀNH CÔNG HAY THẤT BẠI, PHẢI ĐÓNG KẾT NỐI ĐỂ TRÁNH LỖI LOCK TIMEOUT
+        cursor.close()
+        conn.close()
+
+    # Trả về kết quả cho Web
     return jsonify({
         'message': 'Đăng tin thành công!', 
         'id': new_id,
-        # Nếu có best_match >= 90 thì trả về mảng chứa nó, nếu không thì mảng rỗng []
         'matches': [best_match] if best_match else []
     }), 201
 # ── Lấy danh sách bài đăng (có lọc) ──────────────────────────────

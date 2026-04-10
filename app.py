@@ -23,7 +23,7 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='123456',
+        password='06012005',
         database='lost_found_db'
     )
  
@@ -223,28 +223,43 @@ def verify_user(user_id):
 @app.route('/api/posts', methods=['POST'])
 def create_post():
     data = request.get_json()
+    user_id = data.get('user_id')
 
-    # Kiểm tra xác thực
-    if not verify_user(data.get('user_id')):
-        return jsonify({'message': 'Bạn cần đăng nhập để đăng tin!'}), 401
-
-    # Nhận ảnh base64 và lưu thành file
-    image_url = None
-    if data.get('image_base64'):
-        img_data = data['image_base64'].split(',')[1]  
-        filename = f"{uuid.uuid4().hex}.jpg"
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        with open(filepath, 'wb') as f:
-            f.write(base64.b64decode(img_data))
-        image_url = f"/static/uploads/{filename}"
-
+    # 1. Mở kết nối trước để kiểm tra user
     conn = get_db_connection()
-    cursor = conn.cursor()
-    new_id = None
-    best_match = None
-    
+    cursor = conn.cursor(dictionary=True)
+
     try:
-        # 1. THÊM BÀI ĐĂNG (VÀ COMMIT NGAY ĐỂ MỞ KHÓA BẢNG CHO CÁC HÀM KHÁC)
+        # --- BƯỚC CHẶN QUAN TRỌNG NHẤT ---
+        # Kiểm tra xem tài khoản này có bị ban hoặc báo cáo >= 3 không
+        cursor.execute("SELECT is_banned, reports_count FROM users WHERE id = %s", (user_id,))
+        user_status = cursor.fetchone()
+
+        if user_status:
+            if user_status['is_banned'] == 1 or user_status['reports_count'] >= 3:
+                return jsonify({
+                    'message': 'Tài khoản của bạn đã bị khóa do bị báo cáo vi phạm quá nhiều lần!'
+                }), 403
+        # --------------------------------
+
+        # Kiểm tra xác thực (verify_user cũ của bạn)
+        if not user_id:
+            return jsonify({'message': 'Bạn cần đăng nhập để đăng tin!'}), 401
+
+        # Nhận ảnh base64 và lưu thành file
+        image_url = None
+        if data.get('image_base64'):
+            img_data = data['image_base64'].split(',')[1]  
+            filename = f"{uuid.uuid4().hex}.jpg"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            with open(filepath, 'wb') as f:
+                f.write(base64.b64decode(img_data))
+            image_url = f"/static/uploads/{filename}"
+
+        new_id = None
+        best_match = None
+        
+        # Thêm bài đăng
         sql = """
             INSERT INTO posts (user_id, username, type, item_name, category,
                                location, latitude, longitude, lost_date, description, image_url, secret_detail)
@@ -260,16 +275,10 @@ def create_post():
         conn.commit()
         new_id = cursor.lastrowid
         
-        # =========================================================
-        # ── LOGIC AUTO-MATCHING XỬ LÝ TẠI BACKEND ──
-        # =========================================================
+        # Logic Auto-matching
         matched_items = find_matches_for_post(new_id)
-
         if matched_items and matched_items[0]['score'] >= 90:
             best_match = matched_items[0]
-            
-            # Dùng luôn cái cursor đang có, không tạo thêm conn_update nữa để tránh kẹt Lock!
-            # Đổi về trạng thái 'resolved' để không vi phạm kiểu dữ liệu ENUM của MySQL
             cursor.execute(
                 "UPDATE posts SET status='resolved' WHERE id IN (%s, %s)", 
                 (new_id, best_match['post_id'])
@@ -277,15 +286,14 @@ def create_post():
             conn.commit()
 
     except Exception as e:
-        print("Lỗi nghiêm trọng trong quá trình đăng tin/ghép đôi:", str(e))
-        conn.rollback() # Nếu có lỗi xảy ra, trả lại nguyên trạng để không bị kẹt DB
+        print("Lỗi:", str(e))
+        conn.rollback()
+        return jsonify({'message': str(e)}), 500
 
     finally:
-        # BẤT CHẤP THÀNH CÔNG HAY THẤT BẠI, PHẢI ĐÓNG KẾT NỐI ĐỂ TRÁNH LỖI LOCK TIMEOUT
         cursor.close()
         conn.close()
 
-    # Trả về kết quả cho Web
     return jsonify({
         'message': 'Đăng tin thành công!', 
         'id': new_id,
@@ -748,5 +756,38 @@ def mark_notifications_read():
         conn.close()
     return jsonify({'message': 'OK'})
 
+@app.route('/api/report_post', methods=['POST'])
+def report_post():
+    data = request.json
+    post_id = data.get('post_id')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # 1. Tìm chủ bài viết
+        cursor.execute("SELECT user_id FROM posts WHERE id = %s", (post_id,))
+        post_owner = cursor.fetchone()
+        
+        if post_owner:
+            owner_id = post_owner['user_id']
+            
+            # 2. Tăng số lần báo cáo lên 1
+            cursor.execute("UPDATE users SET reports_count = reports_count + 1 WHERE id = %s", (owner_id,))
+            
+            # 3. KIỂM TRA LẠI: Nếu từ 3 trở lên thì khóa (is_banned = 1)
+            cursor.execute("UPDATE users SET is_banned = 1 WHERE id = %s AND reports_count >= 3", (owner_id,))
+            
+            conn.commit()
+            return jsonify({'message': 'Báo cáo thành công!'}), 200
+            
+        return jsonify({'message': 'Không tìm thấy bài viết'}), 404
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'message': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+        
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

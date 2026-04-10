@@ -1886,3 +1886,35 @@ setInterval(loadNotifications, 30000);
 // Hàm render Biểu đồ và Hoạt động gần đây cho Dashboard
 
 loadAdminPosts();
+
+// Trong hàm render bài viết, thêm nút này vào HTML của post:
+// <button onclick="reportPost(${post.id})">Báo cáo</button>
+
+function reportPost(postId) {
+    if (!currentUser) {
+        alert("Bạn cần đăng nhập để thực hiện tính năng này!");
+        return;
+    }
+
+    const reason = prompt("Lý do báo cáo (Spam, Ảnh 18+,...):");
+    if (!reason) return;
+
+    fetch('/api/report_post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            post_id: postId,
+            user_id: currentUser.id,
+            reason: reason
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
+        // Nếu báo cáo xong bị ban luôn thì logout
+        if (data.should_logout) {
+            logout();
+        }
+    })
+    .catch(err => console.error("Lỗi báo cáo:", err));
+}

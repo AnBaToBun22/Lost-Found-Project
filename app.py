@@ -23,7 +23,7 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='06012005',
+        password='Zecter@1234',
         database='lost_found_db'
     )
  
@@ -260,17 +260,19 @@ def create_post():
         best_match = None
         
         # Thêm bài đăng
+        # Thêm bài đăng (Sửa câu lệnh SQL và các tham số)
         sql = """
             INSERT INTO posts (user_id, username, type, item_name, category,
-                               location, latitude, longitude, lost_date, description, image_url, secret_detail)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                               location, latitude, longitude, lost_date, description, image_url, secret_detail, dropoff_point)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         cursor.execute(sql, (
             data['user_id'], data['username'], data['type'],
             data['item_name'], data['category'], data['location'],
             data.get('latitude', ''), data.get('longitude', ''),  
             data['lost_date'], data['description'],
-            image_url, data.get('secret_detail', '')
+            image_url, data.get('secret_detail', ''), 
+            data.get('dropoff_point', '') # <--- Thêm tham số này
         ))
         conn.commit()
         new_id = cursor.lastrowid
@@ -280,11 +282,23 @@ def create_post():
         if matched_items and matched_items[0]['score'] >= 90:
             best_match = matched_items[0]
             cursor.execute(
-                "UPDATE posts SET status='resolved' WHERE id IN (%s, %s)", 
+                "UPDATE posts SET status='matching' WHERE id IN (%s, %s)", 
                 (new_id, best_match['post_id'])
             )
             conn.commit()
-
+            # Thông báo cho chủ bài bị ghép tự động
+            cursor.execute("SELECT user_id, item_name FROM posts WHERE id = %s", (best_match['post_id'],))
+            matched_info = cursor.fetchone()
+            if matched_info:
+                cursor.execute(
+                    "INSERT INTO notifications (user_id, message, post_id) VALUES (%s, %s, %s)",
+                    (
+                        matched_info['user_id'],
+                        f"AI đã tự động ghép bài đăng <b>'{matched_info['item_name']}'</b> của bạn. Hãy vào tab ⏳ Đang ghép để kiểm tra và xác nhận.",
+                        best_match['post_id']
+                    )
+                )
+                conn.commit()
     except Exception as e:
         print("Lỗi:", str(e))
         conn.rollback()
@@ -312,10 +326,10 @@ def get_posts():
     # Thêm việc trả về latitude và longitude để hiển thị chi tiết (nếu cần)
     sql = """SELECT id, user_id, username, type, item_name, category,
                     location, latitude, longitude, lost_date, description, image_url,
-                    status, created_at
+                    status, created_at, dropoff_point, matched_with
              FROM posts WHERE status = %s"""
     status_filter = request.args.get('status', 'active')
-    if status_filter not in ('active', 'resolved'):
+    if status_filter not in ('active', 'resolved', 'matching'):
         status_filter = 'active'
     params = [status_filter]
     if type_filter:
@@ -433,21 +447,31 @@ def update_post(post_id):
     data = request.get_json()
     if not verify_user(data.get('user_id')):
         return jsonify({'message': 'Bạn cần đăng nhập!'}), 401
+    
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # --- CẬP NHẬT CÂU LỆNH SQL VÀ TRUYỀN THÊM BIẾN ---
     sql = """UPDATE posts SET item_name=%s, category=%s, location=%s,
-                              lost_date=%s, description=%s
+                              lost_date=%s, description=%s, dropoff_point=%s
              WHERE id=%s AND user_id=%s"""
+             
     cursor.execute(sql, (
-        data['item_name'], data['category'], data['location'],
-        data['lost_date'], data['description'],
-        post_id, data['user_id']
+        data['item_name'], 
+        data['category'], 
+        data['location'],
+        data['lost_date'], 
+        data['description'], 
+        data.get('dropoff_point', ''), # Lấy giá trị mới, nếu không có thì để rỗng
+        post_id, 
+        data['user_id']
     ))
+    
     conn.commit()
-    cursor.close(); conn.close()
+    cursor.close()
+    conn.close()
     return jsonify({'message': 'Cập nhật thành công!'})
- 
- 
+
 # ── Xóa bài đăng ─────────────────────────────────────────────────
 @app.route('/api/posts/<int:post_id>', methods=['DELETE'])
 def delete_post(post_id):
@@ -787,7 +811,102 @@ def report_post():
     finally:
         cursor.close()
         conn.close()
+# ── Ghép đôi thủ công ────────────────────────────────────────────
+@app.route('/api/posts/<int:post_id>/match', methods=['PUT'])
+def match_posts(post_id):
+    data      = request.get_json()
+    target_id = data.get('target_post_id')
+    user_id   = data.get('user_id')
 
-        
+    if not target_id:
+        return jsonify({'message': 'Thiếu target_post_id'}), 400
+
+    conn   = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT user_id, type FROM posts WHERE id = %s", (post_id,))
+    my_post = cursor.fetchone()
+    if not my_post or str(my_post['user_id']) != str(user_id):
+        cursor.close(); conn.close()
+        return jsonify({'message': 'Không có quyền ghép bài này!'}), 403
+
+    cursor.execute("SELECT type FROM posts WHERE id = %s AND status = 'active'", (target_id,))
+    target_post = cursor.fetchone()
+    if not target_post:
+        cursor.close(); conn.close()
+        return jsonify({'message': 'Bài đích không tồn tại!'}), 404
+    if target_post['type'] == my_post['type']:
+        cursor.close(); conn.close()
+        return jsonify({'message': 'Chỉ ghép bài Mất với bài Nhặt!'}), 400
+
+    cursor.execute(
+        "UPDATE posts SET status='matching', matched_with=%s WHERE id=%s",
+        (target_id, post_id)
+    )
+    cursor.execute(
+        "UPDATE posts SET status='matching', matched_with=%s WHERE id=%s",
+        (post_id, target_id)
+    )
+    conn.commit()
+    # Lấy thông tin 2 bài để tạo thông báo
+    cursor.execute("SELECT user_id, item_name FROM posts WHERE id = %s", (post_id,))
+    my_post_info = cursor.fetchone()
+
+    cursor.execute("SELECT user_id, item_name FROM posts WHERE id = %s", (target_id,))
+    target_post_info = cursor.fetchone()
+
+    # Gửi thông báo cho chủ bài đích (người bị ghép vào)
+    if target_post_info:
+        cursor.execute(
+            "INSERT INTO notifications (user_id, message, post_id) VALUES (%s, %s, %s)",
+            (
+                target_post_info['user_id'],
+                f"Bài đăng <b>'{target_post_info['item_name']}'</b> của bạn đang được ghép với một bài đăng khác. Hãy qua mục ⏳ Đang ghép để kiểm tra thông tin và xác nhận.",
+                target_id
+            )
+        )
+
+    # Gửi thông báo cho chủ bài gốc (người bấm ghép)
+    if my_post_info:
+        cursor.execute(
+            "INSERT INTO notifications (user_id, message, post_id) VALUES (%s, %s, %s)",
+            (
+                my_post_info['user_id'],
+                f"Bài đăng <b>'{my_post_info['item_name']}'</b> của bạn đang được ghép với một bài đăng khác. Hãy qua mục ⏳ Đang ghép để kiểm tra thông tin và xác nhận.",
+                post_id
+            )
+        )
+
+    conn.commit()
+    cursor.close(); conn.close()
+    return jsonify({'message': 'Ghép đôi thành công!'})
+
+
+# ── Huỷ ghép đôi ─────────────────────────────────────────────────
+@app.route('/api/posts/<int:post_id>/unmatch', methods=['PUT'])
+def unmatch_post(post_id):
+    user_id = request.args.get('user_id')
+    conn    = get_db_connection()
+    cursor  = conn.cursor(dictionary=True)
+
+    # Lấy ID bài đang ghép với bài này
+    cursor.execute("SELECT matched_with FROM posts WHERE id=%s", (post_id,))
+    row = cursor.fetchone()
+    matched_id = row['matched_with'] if row else None
+
+    # Đưa cả 2 về active và xóa matched_with
+    cursor.execute(
+        "UPDATE posts SET status='active', matched_with=NULL WHERE id=%s AND user_id=%s",
+        (post_id, user_id)
+    )
+    if matched_id:
+        cursor.execute(
+            "UPDATE posts SET status='active', matched_with=NULL WHERE id=%s",
+            (matched_id,)
+        )
+
+    conn.commit()
+    cursor.close(); conn.close()
+    return jsonify({'message': 'Đã huỷ ghép!'})
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

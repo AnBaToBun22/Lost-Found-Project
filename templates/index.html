@@ -213,7 +213,8 @@
                 <button class="tab-btn active" onclick="filterType('all')" style="background: #3498db; color: #fff; border: none;">Tất cả</button>
                 <button class="tab-btn" onclick="filterType('lost')" style="background: #fff; color: #65676b; border: 1px solid #ddd;">Đang tìm</button>
                 <button class="tab-btn" onclick="filterType('found')" style="background: #fff; color: #65676b; border: 1px solid #ddd;">Đã nhặt được</button>
-                <button class="tab-btn tab-resolved" onclick="filterType('resolved')" style="background: #fff; color: #65676b; border: 1px solid #ddd;">⏳ Đang ghép</button>
+                <button class="tab-btn tab-matching" onclick="filterType('matching')" style="background: #fff; color: #65676b; border: 1px solid #ddd;">⏳ Đang ghép</button>
+                <button class="tab-btn tab-resolved" onclick="filterType('resolved')" style="background: #fff; color: #65676b; border: 1px solid #ddd;">✅ Đã giải quyết</button>
             </div>
 
             <div id="itemsGrid" class="items-grid fb-style-grid"></div>
@@ -325,7 +326,13 @@
                     placeholder="VD: Trong ví có thẻ ngân hàng tên Nguyễn Văn A">
                 <small style="color:#999;">Chỉ bạn và người liên hệ hợp lệ mới thấy thông tin này</small>
             </div>
-
+            <div class="form-group" id="dropoffGroup" style="display:none;">
+                <label>🏢 Điểm gửi đồ (Drop-off Point)</label>
+                <input type="text" id="itemDropoff" list="dropoffSuggestions" 
+                    placeholder="Nhập nơi bạn đã gửi đồ (Bỏ trống nếu bạn đang tự giữ)" 
+                    style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+                <small style="color:#999;">Nếu bạn gửi đồ tại đây, người mất có thể mang giấy tờ đến nhận trực tiếp.</small>
+            </div>
             <div class="form-group">
                 <label>Hình ảnh minh họa</label>
                 <div class="upload-btn-wrapper">
@@ -495,6 +502,12 @@
                 <textarea id="editDescription" rows="3"
                     style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;"></textarea>
             </div>
+            <div class="form-group" id="editDropoffGroup" style="display:none;">
+                <label>🏢 Điểm gửi đồ (Drop-off Point)</label>
+                <input type="text" id="editDropoff" list="editDropoffSuggestions" 
+                       placeholder="Nhập nơi bạn đã gửi đồ..." 
+                       style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">               
+            </div>
             <button class="btn-submit" onclick="submitEdit()">💾 Lưu thay đổi</button>
         </div>
     </div>
@@ -513,13 +526,14 @@
                 <img id="detailImage" src="" alt="Ảnh đồ vật" style="max-width: 100%; max-height: 300px; border-radius: 8px; object-fit: cover; display: none;">
             </div>
 
-            <div class="detail-info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #fff; margin-bottom: 15px;">
+            <div class="detail-info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #fff; margin-bottom: 15px;">              
                 <p style="margin: 0; font-size: 14.5px; color: #444;"><i class="fa-solid fa-tag" style="color: #7f8c8d; width: 20px; text-align: center; margin-right: 5px;"></i> <strong>Danh mục:</strong> <span id="detailCategory"></span></p>
                 <p style="margin: 0; font-size: 14.5px; color: #444;"><i class="fa-solid fa-location-dot" style="color: #7f8c8d; width: 20px; text-align: center; margin-right: 5px;"></i> <strong>Khu vực:</strong> <span id="detailLocation"></span></p>
                 <p style="margin: 0; font-size: 14.5px; color: #444;"><i class="fa-regular fa-calendar" style="color: #7f8c8d; width: 20px; text-align: center; margin-right: 5px;"></i> <strong>Thời gian:</strong> <span id="detailDate"></span></p>
                 <p style="margin: 0; font-size: 14.5px; color: #444;"><i class="fa-solid fa-user" style="color: #7f8c8d; width: 20px; text-align: center; margin-right: 5px;"></i> <strong>Người đăng:</strong> <span id="detailUser" style="color: #3498db; font-weight: bold;"></span></p>
             </div>
-
+            <div id="detailDropoffBox" style="display:none; margin: 15px 0; padding:15px; background:#fff8e1; border:1px dashed #f39c12; border-radius:8px; font-size:14.5px;">
+            </div>
             <div id="detailMapContainer" style="margin-top: 15px; display: none;">
                 <h4 style="margin: 0 0 8px 0; color: #555; font-size: 14px;">
                     <i class="fa-solid fa-map-location-dot" style="color: #3498db;"></i> Vị trí trên bản đồ:

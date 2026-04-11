@@ -244,6 +244,8 @@ function checkLoginBeforeAction(type) {
     // Chỉ hiện ô bí mật khi đăng "Found"
     secret.style.display = type === 'found' ? 'block' : 'none';
 
+    const dropoff = document.getElementById('dropoffGroup');
+    dropoff.style.display = type === 'found' ? 'block' : 'none';
     // Set mặc định ngày hôm nay
     document.getElementById('itemDate').value = new Date().toISOString().split('T')[0];
 
@@ -382,6 +384,7 @@ async function handlePost(e) {
         lost_date    : document.getElementById('itemDate').value,
         description  : document.getElementById('itemDescription').value,
         secret_detail: document.getElementById('itemSecret')?.value || '',
+        dropoff_point: document.getElementById('itemDropoff')?.value || '',
         image_base64 : image_base64
     };
 
@@ -510,6 +513,7 @@ function renderItems(data) {
         const isOwner    = currentUser && currentUser.id === item.user_id;
 
         // Thêm event.stopPropagation() để không bị dội sự kiện bấm vào Card
+        const isMatching   = item.status === 'matching';
         const isResolved   = item.status === 'resolved';
         const ownerButtons = isOwner ? (isResolved ? `
             <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;" onclick="event.stopPropagation()">
@@ -521,8 +525,26 @@ function renderItems(data) {
                     style="padding:6px 12px;background:#FF6B6B;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
                     🗑️ Xóa
                 </button>
+            </div>` : isMatching ? `
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+                <button onclick="event.stopPropagation();resolvePost(${item.id})"
+                    style="padding:6px 12px;background:#1DD1A1;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    ✅ Đã giải quyết
+                </button>
+                <button onclick="event.stopPropagation();unmatchPost(${item.id})"
+                    style="padding:6px 12px;background:#f39c12;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    ↩️ Huỷ ghép
+                </button>
+                <button onclick="event.stopPropagation();deletePost(${item.id})"
+                    style="padding:6px 12px;background:#FF6B6B;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    🗑️ Xóa
+                </button>
             </div>` : `
             <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+                <button onclick="event.stopPropagation();manualMatchPost(${item.id})"
+                    style="padding:6px 12px;background:#9b59b6;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
+                    🔗 Ghép đôi
+                </button>
                 <button onclick="event.stopPropagation();resolvePost(${item.id})"
                     style="padding:6px 12px;background:#1DD1A1;color:white;border:none;border-radius:12px;cursor:pointer;font-size:12px;">
                     ✅ Đã giải quyết
@@ -536,7 +558,11 @@ function renderItems(data) {
                     🗑️ Xóa
                 </button>
             </div>`) : '';
-
+        const dropoffHtml = item.dropoff_point 
+            ? `<div class="card-info" style="color:#27ae60; font-weight:bold;">
+                <i class="fa-solid fa-building-shield"></i> Gửi tại: ${item.dropoff_point}
+            </div>` 
+            : '';
         // Đã thêm sự kiện onclick="showPostDetail" vào từng thẻ bài viết
         grid.innerHTML += `
             <div class="card" data-id="${item.id}" onclick="showPostDetail(${item.id})" style="cursor: pointer;">
@@ -592,7 +618,53 @@ function showPostDetail(postId) {
     } else {
         imgEl.style.display = 'none';
     }
+    // 5.5 XỬ LÝ HIỂN THỊ ĐIỂM GIAO NHẬN (DROP-OFF POINT) CỰC KỲ BẢO MẬT
+    const dropoffBox = document.getElementById('detailDropoffBox');
+    
+    // ĐIỀU KIỆN 1: Đây phải là bài "Nhặt được đồ"
+    const isFoundPost = post.type === 'found';
+    
+    // ĐIỀU KIỆN 2: Người xem đã đăng nhập và KHÔNG PHẢI là người nhặt (người đăng bài)
+    const isNotAuthor = currentUser && currentUser.id !== post.user_id;
 
+    // ĐIỀU KIỆN 3: Người xem chính là NGƯỜI ĐƯỢC MATCHING
+    let isMatchedUser = false;
+    
+    // Nếu bài này đã được AI ghép đôi
+    if (currentUser && (post.status === 'matching')) {
+        // Tìm xem trong hệ thống, người xem có bài "Mất đồ" nào cũng đã "matching" và khớp danh mục không
+        const myLostPost = allPostsData.find(p => 
+            p.user_id === currentUser.id && 
+            p.type === 'lost' && 
+            p.status === 'matching' &&
+            p.matched_with === post.id
+        );
+        
+        // Nếu tìm thấy, xác nhận đây chính là chủ nhân thực sự!
+        if (myLostPost) {
+            isMatchedUser = true;
+        }
+    }
+
+    // CHỐT KẾT QUẢ: Chỉ bung thông tin khi thỏa mãn TOÀN BỘ điều kiện
+    if (post.dropoff_point && isFoundPost && isNotAuthor && isMatchedUser) {
+        dropoffBox.innerHTML = `
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <i class="fa-solid fa-building-shield" style="color:#2ecc71; font-size: 24px; margin-top: 2px;"></i> 
+                <div>
+                    <strong style="color: #2c3e50; font-size: 15px;">Món đồ này đã được gửi lại tại:</strong> 
+                    <span style="color:#d35400; font-weight: bold; font-size: 16px;">${post.dropoff_point}</span>
+                    <div style="color:#777; font-size: 13px; margin-top: 6px; line-height: 1.5;">
+                        * AI đã xác nhận bạn là chủ nhân. Vui lòng mang theo thẻ sinh viên/CCCD đến địa điểm trên để đối chiếu và nhận lại đồ.
+                    </div>
+                </div>
+            </div>
+        `;
+        dropoffBox.style.display = 'block';
+    } else {
+        // Giấu nhẹm đi đối với tất cả những người khác
+        dropoffBox.style.display = 'none';
+    }
     // 5. Mở Modal lên
     document.getElementById('postDetailModal').style.display = 'flex';
     // 5.1 Ẩn khung bình luận cũ đi (để người dùng tự bấm mở nếu muốn)
@@ -654,6 +726,9 @@ function openEditModal(postId) {
     document.getElementById('editLocation').value    = item.location;
     document.getElementById('editDate').value        = item.lost_date;
     document.getElementById('editDescription').value = item.description || '';
+    document.getElementById('editDropoff').value     = item.dropoff_point || '';
+    const dropoffGroup = document.getElementById('editDropoffGroup');
+    if (dropoffGroup) dropoffGroup.style.display = item.type === 'found' ? 'block' : 'none';
     document.getElementById('editModal').style.display = 'flex';
 }
 
@@ -666,7 +741,8 @@ async function submitEdit() {
         category   : document.getElementById('editCategory').value,
         location   : document.getElementById('editLocation').value,
         lost_date  : document.getElementById('editDate').value,
-        description: document.getElementById('editDescription').value
+        description: document.getElementById('editDescription').value,
+        dropoff_point: document.getElementById('editDropoff').value
     };
 
     const res = await fetch(`/api/posts/${postId}`, {
@@ -710,7 +786,12 @@ function filterType(type) {
     if (type === 'resolved') {
         currentTabType   = '';
         currentTabStatus = 'resolved';
-    } else {
+    }
+    else if (type === 'matching') {
+            currentTabType   = '';
+            currentTabStatus = 'matching';
+    }
+    else {
         currentTabType   = type === 'all' ? '' : type;
         currentTabStatus = 'active';
     }
@@ -752,6 +833,72 @@ async function unresolvePost(postId) {
     if (!confirm("Đặt lại bài này thành CHƯA GIẢI QUYẾT?")) return;
     await fetch(`/api/posts/${postId}/unresolve?user_id=${currentUser.id}`, { method: 'PUT' });
     loadPosts(currentTabType, '', '', currentTabStatus);
+}
+
+// Ghép đôi thủ công dùng AI suggest
+async function manualMatchPost(postId) {
+    const myPost = postsMap[postId];
+    if (!myPost) return;
+
+    const oppositeType = myPost.type === 'lost' ? 'found' : 'lost';
+    const params = new URLSearchParams({
+        opposite_type: oppositeType,
+        category     : myPost.category  || '',
+        location     : myPost.location  || '',
+        date         : myPost.lost_date || '',
+        item_name    : myPost.item_name || ''
+    });
+
+    try {
+        const res  = await fetch(`/api/suggest?${params}`);
+        const list = await res.json();
+
+        if (!list || list.length === 0) {
+            alert('🔍 AI không tìm thấy bài đăng nào tương đồng.');
+            return;
+        }
+
+        const best     = list[0];
+        const scoreBar = Math.min(100, (best.score || 1) * 20);
+
+        const confirmed = confirm(
+            `🤖 AI tìm thấy bài phù hợp nhất:\n\n` +
+            `📦 ${best.item_name}\n` +
+            `📍 ${best.location}\n` +
+            `📅 ${best.lost_date}\n` +
+            `👤 ${best.username}\n` +
+            `🎯 Độ tương đồng: ${scoreBar}%\n\n` +
+            `Xác nhận ghép đôi?`
+        );
+        if (!confirmed) return;
+
+        const matchRes = await fetch(`/api/posts/${postId}/match`, {
+            method : 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body   : JSON.stringify({ target_post_id: best.id, user_id: currentUser.id })
+        });
+
+        if (matchRes.ok) {
+            alert('✅ Ghép đôi thành công! Cả 2 bài đã chuyển sang tab ⏳ Đang ghép.');
+            loadPosts(currentTabType, '', '', currentTabStatus);
+        } else {
+            const d = await matchRes.json();
+            alert('❌ ' + (d.message || 'Ghép đôi thất bại!'));
+        }
+    } catch(e) {
+        alert('Lỗi kết nối!');
+    }
+}
+
+// Huỷ ghép đôi
+async function unmatchPost(postId) {
+    if (!confirm("Huỷ ghép và đưa bài về trạng thái ban đầu?")) return;
+    const res = await fetch(`/api/posts/${postId}/unmatch?user_id=${currentUser.id}`, { method: 'PUT' });
+    if (res.ok) {
+        loadPosts(currentTabType, '', '', currentTabStatus);
+    } else {
+        alert('❌ Huỷ ghép thất bại!');
+    }
 }
 
 // ── Helper: format thời gian ──────────────────────────────────────
@@ -1839,13 +1986,13 @@ async function loadNotifications() {
             const bgClass = n.is_read ? '' : 'background-color: #f0f8ff;'; 
             
             html += `
-                <div onclick="openDetailModal(${n.post_id})" style="padding: 12px 15px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; ${bgClass}">
-                    <div style="width:35px; height:35px; border-radius:50%; background:#e8f5e9; color:#2ecc71; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                        <i class="fa-solid fa-comment-dots"></i>
+                <div onclick="showPostDetail(${n.post_id})" style="padding:12px 15px;border-bottom:1px solid #eee;cursor:pointer;display:flex;gap:10px;align-items:flex-start;${bgClass}">
+                    <div style="width:35px;height:35px;border-radius:50%;background:#fff3e0;color:#f39c12;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="fa-solid fa-link"></i>
                     </div>
                     <div>
-                        <p style="margin:0; font-size:14px; color:#333;">${n.message}</p>
-                        <span style="font-size:12px; color:#3498db;">${formatTime(n.created_at)}</span>
+                        <p style="margin:0;font-size:14px;color:#333;">${n.message}</p>
+                        <span style="font-size:12px;color:#3498db;">${formatTime(n.created_at)}</span>
                     </div>
                 </div>
             `;

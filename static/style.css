@@ -1260,7 +1260,8 @@ body { background-color: #f0f2f5; }
     background: #f8fafc;
     color: #4A90E2;
 }
- 
+.tab-matching { border-color: #9b59b6 !important; }
+.tab-matching.active { background: #9b59b6 !important; border-color: #9b59b6 !important; color: white !important; } 
 /* Fix text màu ngoài hero */
 .tab-btn { color: #333 !important; }
 .tab-btn.active { color: white !important; }

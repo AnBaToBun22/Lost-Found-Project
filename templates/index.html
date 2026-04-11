@@ -163,11 +163,11 @@
 
             <hr style="border:0; border-top:1px solid #ccd0d5; margin: 15px 0;">
 
-            
             <div id="fbHiddenMenu" style="display: none; padding-left: 10px; border-left: 2px solid #ddd; margin-left: 20px; margin-top: 5px;">
                 <div class="fb-menu-item" onclick="alert('Tính năng cài đặt đang được phát triển!')">
                     <i class="fa-solid fa-gear" style="color: #555;"></i> Cài đặt
                 </div>
+                
                 <div class="fb-menu-item" onclick="handleLogout()">
                     <i class="fa-solid fa-right-from-bracket" style="color: #e74c3c;"></i> Đăng xuất
                 </div>
@@ -451,7 +451,28 @@
 
         </div>
     </div>
+<div id="updateProfileModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+    <div style="background-color: #e0f2f1; padding: 30px; border-radius: 12px; width: 350px; text-align: center; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+        <span onclick="closeUpdateProfileModal()" style="position: absolute; right: 15px; top: 10px; font-size: 24px; font-weight: bold; cursor: pointer; color: #333;">&times;</span>
+        <h2 style="margin-bottom: 20px; color: #333;">Cập nhật thông tin</h2>
+        
+        <input type="text" id="upd_username" placeholder="Tên đăng nhập" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        <input type="email" id="upd_email" placeholder="Email sinh viên" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        <input type="password" id="upd_password" placeholder="Mật khẩu mới (Bỏ trống nếu không đổi)" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        <input type="text" id="upd_phone" placeholder="Số điện thoại" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        
+        <select id="upd_region" style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+            <option value="">Chọn khu vực của bạn...</option>
+            <option value="Hòa Khánh">Cơ sở Hòa Khánh</option>
+            <option value="Quang Trung">Cơ sở Quang Trung</option>
+            <option value="Việt Bắc">Cơ sở Việt Bắc</option>
+            <option value="Hòa Minh">Cơ sở Hòa Minh</option>
+            <option value="Khác">Khác</option>
+        </select>
 
+        <button onclick="submitUpdateProfile()" style="width: 100%; background-color: #4A90E2; color: white; padding: 12px; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer;">LƯU THAY ĐỔI</button>
+    </div>
+</div>
 <div id="aiMatchModal" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 450px; text-align: center; background: #e0faff; border-radius: 15px; border: 2px solid #1dd1a1;">
         <h3 style="color: #2c3e50; margin-top: 0;">
@@ -614,6 +635,72 @@
                 }
             }
         }
+        // Mở Form cập nhật và điền sẵn thông tin cũ
+function openUpdateProfileModal() {
+    if (!currentUser) return alert("Vui lòng đăng nhập!");
+    
+    // Đổ dữ liệu cũ vào các ô để người dùng dễ sửa
+    document.getElementById('upd_username').value = currentUser.username || '';
+    document.getElementById('upd_email').value = currentUser.email || '';
+    document.getElementById('upd_password').value = ''; // Luôn để trống mật khẩu
+    
+    // (Vì SĐT và Khu vực đang ẩn trong DB, bạn có thể thiết lập ô trống để user nhập mới)
+    document.getElementById('upd_phone').value = '';
+    document.getElementById('upd_region').value = '';
+
+    // Hiển thị Form
+    document.getElementById('updateProfileModal').style.display = 'flex';
+}
+
+// Đóng Form
+function closeUpdateProfileModal() {
+    document.getElementById('updateProfileModal').style.display = 'none';
+}
+
+// Gửi dữ liệu lên Server
+async function submitUpdateProfile() {
+    const username = document.getElementById('upd_username').value.trim();
+    const email = document.getElementById('upd_email').value.trim();
+    const password = document.getElementById('upd_password').value.trim();
+    const phone = document.getElementById('upd_phone').value.trim();
+    const region = document.getElementById('upd_region').value;
+
+    if (!username) return alert("Vui lòng không để trống tên đăng nhập!");
+
+    try {
+        const res = await fetch('/api/users/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: currentUser.id,
+                username: username,
+                email: email,
+                password: password,
+                phone: phone,
+                region: region
+            })
+        });
+
+        const result = await res.json();
+        
+        if (res.ok) {
+            alert("Cập nhật thông tin thành công!");
+            
+            // Cập nhật lại thông tin mới vào LocalStorage để trình duyệt nhận diện tên mới
+            currentUser = result.user;
+            localStorage.setItem("currentUser", JSON.stringify(currentUser));
+            
+            // Đóng Form và load lại giao diện
+            closeUpdateProfileModal();
+            window.location.reload(); 
+        } else {
+            alert(result.message || "Đã xảy ra lỗi!");
+        }
+    } catch (error) {
+        console.error("Lỗi:", error);
+        alert("Lỗi kết nối tới máy chủ.");
+    }
+}
     </script>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>

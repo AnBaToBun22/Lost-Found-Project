@@ -23,7 +23,7 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='Zecter@1234',
+        password='123456',
         database='lost_found_db'
     )
  
@@ -100,7 +100,65 @@ def get_all_users():
     cursor.close()
     conn.close()
     return jsonify(users)
- 
+# ── API ADMIN: THÊM NGƯỜI DÙNG MỚI ─────────────────────────
+@app.route('/api/users', methods=['POST'])
+def admin_add_user():
+    data = request.get_json()
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password', '123456')
+    role = data.get('role', 'user')
+    phone = data.get('phone', '')
+    region = data.get('region', '')
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, email, password, phone, region, role) VALUES (%s, %s, %s, %s, %s, %s)", 
+            (username, email, password, phone, region, role)
+        )
+        conn.commit()
+        return jsonify({'message': 'Đã thêm người dùng!'}), 201
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+# ── API ADMIN: SỬA THÔNG TIN NGƯỜI DÙNG ─────────────────────────
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+def admin_edit_user(user_id):
+    data = request.get_json()
+    username = data.get('username')
+    email = data.get('email')
+    role = data.get('role')
+    phone = data.get('phone', '')
+    region = data.get('region', '')
+    password = data.get('password')
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Nếu Admin có gõ pass mới -> Update cả pass
+        if password and len(password.strip()) > 0:
+            cursor.execute(
+                "UPDATE users SET username=%s, email=%s, role=%s, phone=%s, region=%s, password=%s WHERE id=%s", 
+                (username, email, role, phone, region, password, user_id)
+            )
+        else:
+            # Bỏ trống pass -> Chỉ update các thứ khác, giữ nguyên pass cũ
+            cursor.execute(
+                "UPDATE users SET username=%s, email=%s, role=%s, phone=%s, region=%s WHERE id=%s", 
+                (username, email, role, phone, region, user_id)
+            )
+        conn.commit()
+        return jsonify({'message': 'Đã cập nhật!'}), 200
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
 @app.route('/api/users/<int:id>', methods=['DELETE'])
 def delete_user(id):
  
@@ -114,8 +172,55 @@ def delete_user(id):
     conn.close()
  
     return jsonify({"message":"Đã xóa user"})
- 
-# --- 1. HÀM TOÁN HỌC: Tính khoảng cách giữa 2 tọa độ (Công thức Haversine) ---
+# ── API: NGƯỜI DÙNG CẬP NHẬT THÔNG TIN CÁ NHÂN ─────────────────────
+@app.route('/api/users/profile', methods=['PUT'])
+def update_user_profile():
+    data = request.json
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return jsonify({'message': 'Thiếu user_id'}), 400
+
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password')
+    phone = data.get('phone')
+    region = data.get('region')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Nếu người dùng có nhập mật khẩu mới thì cập nhật cả mật khẩu
+        if password and len(password.strip()) > 0:
+            cursor.execute("""
+                UPDATE users 
+                SET username=%s, email=%s, password=%s, phone=%s, region=%s 
+                WHERE id=%s
+            """, (username, email, password, phone, region, user_id))
+        else:
+            # Nếu để trống mật khẩu thì giữ nguyên mật khẩu cũ
+            cursor.execute("""
+                UPDATE users 
+                SET username=%s, email=%s, phone=%s, region=%s 
+                WHERE id=%s
+            """, (username, email, phone, region, user_id))
+        
+        conn.commit()
+
+        # Lấy lại thông tin mới để cập nhật cho trình duyệt
+        cursor.execute("SELECT id, username, email, role FROM users WHERE id=%s", (user_id,))
+        updated_user = cursor.fetchone()
+
+        return jsonify({
+            'message': 'Cập nhật thông tin thành công!',
+            'user': updated_user
+        }), 200
+    except Exception as e:
+        return jsonify({'message': 'Lỗi cập nhật: Có thể tên đăng nhập đã tồn tại.'}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
 def calculate_distance(lat1, lon1, lat2, lon2):
     if not all([lat1, lon1, lat2, lon2]):
         return 9999 # Trả về số rất lớn nếu 1 trong 2 bài thiếu tọa độ

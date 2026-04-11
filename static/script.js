@@ -8,14 +8,11 @@ let mockData = [
 let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
 let allPostsData = []; // Biến lưu toàn bộ bài viết từ DB để xem chi tiết
 
-// --- 2. HỆ THỐNG AUTH (LOGIN/LOGOUT/REGISTER) ---
-
-// Khởi chạy khi load trang: Kiểm tra xem đã login chưa
 function initAuth() {
     const userArea = document.getElementById('userArea');
     if (currentUser) {
         // Đã đăng nhập -> Hiện Avatar + Mũi tên (Giống Facebook)
-        userArea.innerHTML = `
+            userArea.innerHTML = `
             <div class="user-dropdown-container">
                 <div class="user-trigger" onclick="toggleDropdown(event)">
                     <div class="user-avatar-circle">
@@ -24,10 +21,15 @@ function initAuth() {
                     <i class="fa-solid fa-chevron-down caret-icon"></i>
                 </div>
                 <div id="userDropdownMenu" class="dropdown-menu-box">
-                    <div class="menu-header"><strong>${currentUser.username}</strong></div>
-                    <hr>
-                    <button class="menu-item logout-red" onclick="handleLogout()">
-                        <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+                    <div class="menu-header" style="padding: 10px 15px;"><strong>${currentUser.username}</strong></div>
+                    <hr style="margin: 0; border: 0; border-top: 1px solid #eee;">
+                    
+                    <button class="menu-item" onclick="openUpdateProfileModal()" style="width: 100%; text-align: left; background: none; border: none; padding: 12px 15px; cursor: pointer; display: flex; gap: 10px; align-items: center; font-family: inherit; font-size: 14px; color: #333; transition: background 0.2s;">
+                        <i class="fa-solid fa-user-pen" style="color: #4A90E2; width: 16px; text-align: center;"></i> Cập nhật thông tin
+                    </button>
+                    
+                    <button class="menu-item logout-red" onclick="handleLogout()" style="width: 100%; text-align: left; background: none; border: none; padding: 12px 15px; cursor: pointer; display: flex; gap: 10px; align-items: center; font-family: inherit; font-size: 14px; color: #e74c3c; transition: background 0.2s;">
+                        <i class="fa-solid fa-right-from-bracket" style="width: 16px; text-align: center;"></i> Đăng xuất
                     </button>
                 </div>
             </div>
@@ -1688,12 +1690,17 @@ function updateUserArea() {
                     <i class="fa-solid fa-chevron-down caret-icon"></i>
                 </div>
                 <div id="userDropdownMenu" class="dropdown-menu-box">
-                    <div class="menu-header">
+                    <div class="menu-header" style="padding: 10px 15px;">
                         <strong>${dataToUse.username}</strong>
                     </div>
-                    <hr>
-                    <button class="menu-item logout-red" onclick="handleLogout()">
-                        <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+                    <hr style="margin: 0; border: 0; border-top: 1px solid #eee;">
+                    
+                    <button class="menu-item" onclick="openUpdateProfileModal()" style="width: 100%; text-align: left; background: none; border: none; padding: 12px 15px; cursor: pointer; display: flex; gap: 10px; align-items: center; font-family: inherit; font-size: 14px; color: #333; transition: background 0.2s;">
+                        <i class="fa-solid fa-user-pen" style="color: #4A90E2; width: 16px; text-align: center;"></i> Cập nhật thông tin
+                    </button>
+
+                    <button class="menu-item logout-red" onclick="handleLogout()" style="width: 100%; text-align: left; background: none; border: none; padding: 12px 15px; cursor: pointer; display: flex; gap: 10px; align-items: center; font-family: inherit; font-size: 14px; color: #e74c3c; transition: background 0.2s;">
+                        <i class="fa-solid fa-right-from-bracket" style="width: 16px; text-align: center;"></i> Đăng xuất
                     </button>
                 </div>
             </div>

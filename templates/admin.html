@@ -103,7 +103,10 @@
     <div id="section-users" class="table-section">
         <div class="table-container">
             <h3>Users</h3>
-            <button class="btn-refresh" onclick="loadUsers()"><i class="fa-solid fa-rotate"></i> Làm mới</button>
+                <button class="btn-refresh" onclick="loadUsers()" style="margin-bottom: 0;"><i class="fa-solid fa-rotate"></i> Làm mới</button>
+                <button onclick="openAddUserModal()" style="background: #10b981; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; margin-left: 10px; font-weight: 600; font-size: 14px;">
+                    <i class="fa-solid fa-plus"></i> Thêm người dùng
+                    </button>
             <table>
                 <thead>
                     <tr>
@@ -157,31 +160,95 @@
         if (name === 'users') loadUsers();
         if (name === 'items') loadAdminPosts();
     }
+async function loadUsers() {
+    try {
+        const res = await fetch("/api/users");
+        const users = await res.json();
+        const table = document.getElementById("userTable");
+        document.getElementById("totalUsers").innerText = users.length;
+        
+        table.innerHTML = "";
+        users.forEach(u => {
+            // Truyền thêm phone và region vào nút Sửa
+            table.innerHTML += `
+                <tr>
+                    <td>${u.id}</td>
+                    <td>${u.username}</td>
+                    <td>${u.email || 'Chưa cập nhật'}</td>
+                    <td><span class="badge">${u.role || 'user'}</span></td>
+                    <td>
+                        <button onclick="openEditUserModal(${u.id}, '${u.username}', '${u.email || ''}', '${u.role || 'user'}', '${u.phone || ''}', '${u.region || ''}')" 
+                            style="background: #f59e0b; color: white; padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; margin-right: 5px; font-size: 13px;">
+                            <i class="fa-solid fa-pen"></i> Sửa
+                        </button>
+                        <button class="btn-delete" onclick="deleteUser(${u.id})">
+                            <i class="fa-solid fa-trash"></i> Xóa
+                        </button>
+                    </td>
+                </tr>`;
+        });
+    } catch (err) { console.error("Lỗi tải users:", err); }
+}
 
-    // --- QUẢN LÝ NGƯỜI DÙNG ---
-    async function loadUsers() {
-        try {
-            const res = await fetch("/api/users");
-            const users = await res.json();
-            const table = document.getElementById("userTable");
-            document.getElementById("totalUsers").innerText = users.length;
-            
-            table.innerHTML = "";
-            users.forEach(u => {
-                table.innerHTML += `
-                    <tr>
-                        <td>${u.id}</td>
-                        <td>${u.username}</td>
-                        <td>${u.email}</td>
-                        <td><span class="badge">${u.role || 'User'}</span></td>
-                        <td><button class="btn-delete" onclick="deleteUser(${u.id})">Xóa</button></td>
-                    </tr>`;
-            });
-        } catch (err) {
-            console.error("Lỗi tải users:", err);
-        }
-    }
+function openAddUserModal() {
+    document.getElementById('adminModalTitle').innerText = "Thêm Người Dùng";
+    document.getElementById('admin_user_id').value = ""; 
+    document.getElementById('admin_username').value = "";
+    document.getElementById('admin_email').value = "";
+    document.getElementById('admin_password').value = "";
+    document.getElementById('admin_phone').value = "";
+    document.getElementById('admin_region').value = "";
+    document.getElementById('admin_role').value = "user";
+    document.getElementById('adminUserModal').style.display = 'flex';
+}
 
+function openEditUserModal(id, username, email, role, phone, region) {
+    document.getElementById('adminModalTitle').innerText = "Sửa Thông Tin";
+    document.getElementById('admin_user_id').value = id; 
+    document.getElementById('admin_username').value = username;
+    document.getElementById('admin_email').value = email;
+    document.getElementById('admin_password').value = ""; // Mật khẩu luôn để trống cho an toàn
+    document.getElementById('admin_phone').value = phone;
+    document.getElementById('admin_region').value = region;
+    document.getElementById('admin_role').value = role;
+    document.getElementById('adminUserModal').style.display = 'flex';
+}
+
+async function submitAdminUser() {
+    const id = document.getElementById('admin_user_id').value;
+    const username = document.getElementById('admin_username').value.trim();
+    const email = document.getElementById('admin_email').value.trim();
+    const password = document.getElementById('admin_password').value.trim();
+    const phone = document.getElementById('admin_phone').value.trim();
+    const region = document.getElementById('admin_region').value;
+    const role = document.getElementById('admin_role').value;
+
+    if (!username) return alert("Tên đăng nhập không được để trống!");
+
+    const isEdit = id !== ""; 
+    const url = isEdit ? `/api/users/${id}` : '/api/users';
+    const method = isEdit ? 'PUT' : 'POST';
+    
+    // Đóng gói dữ liệu gửi đi
+    const bodyData = { username, email, role, phone, region };
+    
+    // Nếu có nhập pass thì mới gửi pass lên (để update hoặc tạo mới)
+    if (password) bodyData.password = password;
+    if (!isEdit && !password) bodyData.password = "123456"; // Pass mặc định nếu tạo mới mà quên nhập
+
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyData)
+        });
+        if (res.ok) {
+            alert(isEdit ? "Đã lưu thay đổi!" : "Đã tạo tài khoản mới!");
+            document.getElementById('adminUserModal').style.display = 'none';
+            loadUsers();
+        } else alert("Lỗi: Có thể tên đăng nhập đã bị trùng!");
+    } catch (err) { alert("Lỗi kết nối tới Server!"); }
+}
     async function deleteUser(id) {
         if (!confirm("Bạn có chắc chắn muốn xóa người dùng này?")) return;
         try {
@@ -338,6 +405,34 @@ document.addEventListener("DOMContentLoaded", function() {
     loadRecentActivities();
 });
 </script>
+<div id="adminUserModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+    <div style="background-color: #f4f6fb; padding: 30px; border-radius: 12px; width: 380px; text-align: center; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+        <span onclick="document.getElementById('adminUserModal').style.display='none'" style="position: absolute; right: 15px; top: 10px; font-size: 24px; font-weight: bold; cursor: pointer; color: #333;">&times;</span>
+        
+        <h2 id="adminModalTitle" style="margin-bottom: 20px; color: #333;">Thêm Người Dùng</h2>
+        <input type="hidden" id="admin_user_id">
 
+        <input type="text" id="admin_username" placeholder="Tên đăng nhập" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        <input type="email" id="admin_email" placeholder="Email liên hệ" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        <input type="password" id="admin_password" placeholder="Mật khẩu (Bỏ trống nếu không đổi)" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        <input type="text" id="admin_phone" placeholder="Số điện thoại" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        
+        <select id="admin_region" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+            <option value="">Chọn khu vực...</option>
+            <option value="Đà Nẵng">Đà Nẵng</option>
+            <option value="Hà Nội">Hà Nội</option>
+            <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
+            <option value="Hải Phòng">Hải Phòng</option>
+            <option value="Khác">Khác</option>
+        </select>
+
+        <select id="admin_role" style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+            <option value="user">Quyền: User bình thường</option>
+            <option value="admin">Quyền: Quản trị viên (Admin)</option>
+        </select>
+
+        <button onclick="submitAdminUser()" style="width: 100%; background-color: #4A90E2; color: white; padding: 12px; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer;">LƯU THÔNG TIN</button>
+    </div>
+</div>
 </body>
 </html>

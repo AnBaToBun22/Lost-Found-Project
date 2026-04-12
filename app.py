@@ -297,8 +297,8 @@ def find_matches_for_post(post_id):
             matches.append({
                 'post_id': cand['id'],
                 'item_name': cand['item_name'],
-                'category': cand['category'], # Thêm dòng này
-                'location': cand['location'], # Thêm dòng này
+                'category': cand['category'],
+                'location': cand['location'],
                 'score': score,
                 'contact_user': cand['username'],
                 'distance_km': round(dist, 1) if dist != 9999 else "Không rõ"
@@ -309,7 +309,7 @@ def find_matches_for_post(post_id):
  
     # Sắp xếp lại: Đứa nào điểm cao nhất đứng đầu
     return sorted(matches, key=lambda x: x['score'], reverse=True)
-# ── Helper: kiểm tra user_id có tồn tại trong DB không ───────────
+
 def verify_user(user_id):
     if not user_id:
         return False

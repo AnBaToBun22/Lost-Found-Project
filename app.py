@@ -23,7 +23,7 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='123456',
+        password='Zecter@1234',
         database='lost_found_db'
     )
  
@@ -1013,5 +1013,18 @@ def unmatch_post(post_id):
     conn.commit()
     cursor.close(); conn.close()
     return jsonify({'message': 'Đã huỷ ghép!'})
+@app.route('/api/posts/<int:post_id>/info', methods=['GET'])
+def get_post_info(post_id):
+    conn   = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT id, item_name, username, type, location FROM posts WHERE id = %s",
+        (post_id,)
+    )
+    post = cursor.fetchone()
+    cursor.close(); conn.close()
+    if not post:
+        return jsonify({'message': 'Không tìm thấy'}), 404
+    return jsonify(post)
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -510,6 +510,13 @@ function renderItems(data) {
 
         const badgeClass = item.type === 'lost' ? 'tag-lost' : 'tag-found';
         const badgeText  = item.type === 'lost' ? '🔴 Đang tìm' : '🟢 Đã nhặt';
+        // Badge ghép đôi
+        const matchBadge = (item.status === 'matching' && item.matched_with)
+            ? `<div style="background:#f3e5f5;border:1.5px solid #9b59b6;border-radius:8px;padding:6px 10px;margin-top:8px;font-size:12px;color:#6c3483;display:flex;align-items:center;gap:6px;">
+                <i class="fa-solid fa-link"></i>
+                <span>Đang ghép với: <b id="matchedTitle_${item.id}">Đang tải...</b></span>
+            </div>`
+            : '';
         const imgSrc     = item.image_url || 'https://via.placeholder.com/300x180/ddd/999?text=No+Image';
         const timeAgo    = formatTime(item.created_at);
         const isOwner    = currentUser && currentUser.id === item.user_id;
@@ -579,9 +586,32 @@ function renderItems(data) {
                     <div class="card-info"><i class="fa-regular fa-calendar"></i> ${item.lost_date}</div>
                     <div class="card-info"><i class="fa-regular fa-clock"></i> ${timeAgo}</div>
                     ${item.description ? `<p style="font-size:13px;color:#888;margin-top:8px;">${item.description}</p>` : ''}
+                    ${matchBadge}
                     ${ownerButtons}
                 </div>
             </div>`;
+    });
+    // Điền tên bài đang ghép
+    data.forEach(item => {
+        if (item.status === 'matching' && item.matched_with) {
+            const el = document.getElementById(`matchedTitle_${item.id}`);
+            if (!el) return;
+
+            const matched = allPostsData.find(p => p.id === item.matched_with);
+            if (matched) {
+                el.textContent = `"${matched.item_name}" — ${matched.username}`;
+            } else {
+                // Fetch riêng nếu bài kia không có trong tab hiện tại
+                fetch(`/api/posts/${item.matched_with}/info`)
+                    .then(r => r.json())
+                    .then(info => {
+                        el.textContent = `"${info.item_name}" — ${info.username}`;
+                    })
+                    .catch(() => {
+                        el.textContent = `#${item.matched_with}`;
+                    });
+            }
+        }
     });
     if (typeof drawPinsOnMap === 'function') { drawPinsOnMap(data); }
 }

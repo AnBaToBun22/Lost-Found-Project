@@ -23,7 +23,7 @@ def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='Zecter@1234',
+        password='123456',
         database='lost_found_db'
     )
  
